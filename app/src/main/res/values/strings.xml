@@ -6,14 +6,30 @@
     <string name="nav_add">Dodaj</string>
     <string name="nav_stats">Statistika</string>
 
+    <string name="person_lovel">Lovel</string>
+    <string name="person_marina">Marina</string>
+
+    <string name="loading">Učitavanje…</string>
+    <string name="sign_in_subtitle">Zajednički troškovi Lovela i Marine</string>
+    <string name="sign_in_button">Prijavi se Google računom</string>
+    <string name="sign_in_error_no_account">Na uređaju nema Google računa. Dodaj ga u postavkama telefona.</string>
+    <string name="sign_in_error_failed">Prijava nije uspjela. Pokušaj ponovno.</string>
+    <string name="no_access_title">Ovaj račun nema pristup</string>
+    <string name="no_access_body">Račun %1$s nije na popisu članova.</string>
+    <string name="session_error_title">Pristup trenutno nije moguće provjeriti.</string>
+    <string name="retry">Pokušaj ponovno</string>
+    <string name="sign_out">Odjavi se</string>
+
     <string name="balance_title">Stanje</string>
     <string name="balance_lovel_owes">Lovel duguje Marini %1$s</string>
     <string name="balance_marina_owes">Marina duguje Lovelu %1$s</string>
     <string name="balance_settled">Sve je podmireno</string>
-    <plurals name="balance_sample_note">
-        <item quantity="one">Primjer: %1$d trošak (stvarni podaci stižu uskoro)</item>
-        <item quantity="few">Primjer: %1$d troška (stvarni podaci stižu uskoro)</item>
-        <item quantity="other">Primjer: %1$d troškova (stvarni podaci stižu uskoro)</item>
+    <string name="home_empty">Nema troškova</string>
+    <string name="home_load_error">Podaci se trenutno ne mogu učitati.</string>
+    <plurals name="home_expense_count">
+        <item quantity="one">%1$d trošak</item>
+        <item quantity="few">%1$d troška</item>
+        <item quantity="other">%1$d troškova</item>
     </plurals>
 
     <string name="add_placeholder">Unos troška stiže uskoro.</string>

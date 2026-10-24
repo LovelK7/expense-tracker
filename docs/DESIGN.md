@@ -92,6 +92,18 @@ budgets, custom split ratios, push notifications, web dashboard.
   (or a `:data` module if it grows).
 - `tools/` – Python admin scripts (import from the legacy xlsx, export/backup). Never commit output.
 
+## Firestore layout (Stage 2)
+
+- `config/members`: `{ emails: [lowercase email], persons: { "<email>": "LOVEL" | "MARINA" } }`.
+  Written only by `tools/seed_members.py` (Admin SDK); readable by members. Dots in the email map
+  keys are fine (plain map keys, never used as field paths). The signed-in email maps to the
+  `Person` that becomes `createdBy` on new records.
+- `expenses/{id}`, `settlements/{id}`: client-generated ids = document ids; fields mirror the
+  domain models (`date` as `yyyy-MM-dd` string, `amountCents` integer, Firestore timestamps,
+  enum names as strings, `deleted` boolean). No hard deletes.
+- `firestore.rules`: members only (verified token email in `config/members.emails`); strict field
+  validation; `createdBy` = writer's person on create; `createdBy`/`createdAt` immutable on update.
+
 ## Private data and secrets
 
 `private/` holds the legacy workbook, generated CSVs and anything personal. It is gitignored.

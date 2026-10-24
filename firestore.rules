@@ -1,0 +1,114 @@
+rules_version = '2';
+
+// Troškovi: two allow-listed Google accounts share expenses and settlements.
+//
+// config/members = { emails: [string], persons: { "<email>": "LOVEL" | "MARINA" } }
+// (lowercase emails; written only by tools/seed_members.py with the Admin SDK, which bypasses
+// these rules). Record fields mirror app/.../data/FirestoreMappers.kt; keep the two in sync.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function membersDoc() {
+      return /databases/$(database)/documents/config/members;
+    }
+
+    function email() {
+      return request.auth.token.email.lower();
+    }
+
+    function isMember() {
+      return request.auth != null
+        && request.auth.token.email is string
+        && request.auth.token.email_verified == true
+        && exists(membersDoc())
+        && email() in get(membersDoc()).data.emails;
+    }
+
+    // The writer's own Person; only meaningful after isMember().
+    function myPerson() {
+      return get(membersDoc()).data.persons[email()];
+    }
+
+    function isPerson(v) {
+      return v is string && v in ['LOVEL', 'MARINA'];
+    }
+
+    function isDate(v) {
+      return v is string && v.matches('^\\d{4}-\\d{2}-\\d{2}$');
+    }
+
+    function isText(v, maxLen) {
+      return v is string && v.size() <= maxLen;
+    }
+
+    function isAmount(v) {
+      return v is int && v > 0;
+    }
+
+    function hasExactly(d, fields) {
+      return d.keys().hasAll(fields) && d.keys().hasOnly(fields);
+    }
+
+    function validExpense(d) {
+      return hasExactly(d, ['date', 'category', 'description', 'amountCents', 'paidBy', 'split',
+                            'createdAt', 'updatedAt', 'createdBy', 'deleted'])
+        && isDate(d.date)
+        && isText(d.category, 100) && d.category.size() > 0
+        && isText(d.description, 1000)
+        && isAmount(d.amountCents)
+        && isPerson(d.paidBy)
+        && d.split is string && d.split in ['HALF', 'FULL_FOR_OTHER']
+        && d.createdAt is timestamp
+        && d.updatedAt is timestamp
+        && isPerson(d.createdBy)
+        && d.deleted is bool;
+    }
+
+    function validSettlement(d) {
+      return hasExactly(d, ['date', 'from', 'to', 'amountCents', 'note',
+                            'createdAt', 'updatedAt', 'createdBy', 'deleted'])
+        && isDate(d.date)
+        && isPerson(d.from)
+        && isPerson(d.to)
+        && d.from != d.to
+        && isAmount(d.amountCents)
+        && isText(d.note, 1000)
+        && d.createdAt is timestamp
+        && d.updatedAt is timestamp
+        && isPerson(d.createdBy)
+        && d.deleted is bool;
+    }
+
+    // A new record is stamped with the writer's own person.
+    function createdByMe() {
+      return request.resource.data.createdBy == myPerson();
+    }
+
+    // Either member may edit any record, but authorship and creation time stay fixed.
+    function keepsAuthorship() {
+      return request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    match /config/members {
+      allow read: if isMember();
+      allow write: if false;
+    }
+
+    match /expenses/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && validExpense(request.resource.data) && createdByMe();
+      allow update: if isMember() && validExpense(request.resource.data) && keepsAuthorship();
+      allow delete: if false; // soft delete only: set deleted = true
+    }
+
+    match /settlements/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && validSettlement(request.resource.data) && createdByMe();
+      allow update: if isMember() && validSettlement(request.resource.data) && keepsAuthorship();
+      allow delete: if false;
+    }
+
+    // Everything else is denied (no other match blocks).
+  }
+}

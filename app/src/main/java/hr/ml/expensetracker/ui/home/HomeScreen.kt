@@ -1,15 +1,18 @@
 package hr.ml.expensetracker.ui.home
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -31,12 +34,27 @@ fun HomeScreen(modifier: Modifier = Modifier, viewModel: HomeViewModel = koinVie
 @Composable
 private fun HomeContent(state: HomeUiState, modifier: Modifier = Modifier) {
     Column(modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        BalanceCard(state.balanceCents)
-        Text(
-            text = pluralStringResource(R.plurals.balance_sample_note, state.expenseCount, state.expenseCount),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        when {
+            state.loading -> Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            state.error -> Text(
+                text = stringResource(R.string.home_load_error),
+                color = MaterialTheme.colorScheme.error,
+            )
+            else -> {
+                BalanceCard(state.balanceCents)
+                Text(
+                    text = if (state.expenseCount == 0) {
+                        stringResource(R.string.home_empty)
+                    } else {
+                        pluralStringResource(R.plurals.home_expense_count, state.expenseCount, state.expenseCount)
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
@@ -71,6 +89,6 @@ private fun BalanceCard(balanceCents: Long) {
 @Composable
 private fun HomeContentPreview() {
     TroskoviTheme(dynamicColor = false) {
-        HomeContent(HomeUiState(balanceCents = -53_470, expenseCount = 5))
+        HomeContent(HomeUiState(loading = false, balanceCents = -53_470, expenseCount = 5))
     }
 }

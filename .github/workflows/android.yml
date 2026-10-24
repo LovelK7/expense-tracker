@@ -28,8 +28,11 @@ jobs:
       # Caches Gradle dependencies/wrapper and validates the wrapper checksum.
       - uses: gradle/actions/setup-gradle@v6
 
-      # No google-services.json is needed yet (Firebase arrives in Stage 2).
+      # The real google-services.json is gitignored; the placeholder is enough to compile.
       # private/ is absent in CI, so LegacyGoldenTest is skipped.
+      - name: Use placeholder Firebase config
+        run: cp google-services.json.example app/google-services.json
+
       - name: Test, lint and build
         run: ./gradlew :domain:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 
@@ -48,3 +51,36 @@ jobs:
           path: |
             domain/build/reports/
             app/build/reports/
+
+  firebase-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: firebase/rules-tests
+    steps:
+      - uses: actions/checkout@v7
+
+      # The Firestore emulator is a Java program.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: firebase/rules-tests/package-lock.json
+
+      - name: Cache Firestore emulator
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ hashFiles('firebase/rules-tests/package-lock.json') }}
+
+      - run: npm ci
+
+      # Uses the demo-troskovi project id: no login, nothing leaves the runner.
+      - name: Rules tests on the Firestore emulator
+        run: npm run test:emulator

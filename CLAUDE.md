@@ -24,6 +24,19 @@ Start-Process "$sdk\emulator\emulator.exe" -ArgumentList '-avd','Pixel_9_new','-
 & "$sdk\platform-tools\adb.exe" shell am start -n hr.ml.expensetracker/.MainActivity
 ```
 
+Firestore rules tests (Node + JDK 21 on PATH; no Firebase login, uses the emulator):
+
+```powershell
+cd firebase\rules-tests; npm ci; npm run test:emulator
+```
+
+Firebase admin (needs `private/serviceAccountKey.json`; see README "Firebase"):
+
+```powershell
+python tools\seed_members.py      # private\members.json -> Firestore config/members
+python tools\deploy_rules.py      # firestore.rules -> project troskovi-ml
+```
+
 Legacy import (needs `private/Financije_ML_2023.xlsx`):
 
 ```powershell
@@ -34,9 +47,14 @@ python tools\export_legacy.py    # -> private\legacy_popis.csv, private\legacy_c
 ## Layout
 
 - `:domain` – pure Kotlin/JVM, no Android deps. `Expense`, `Settlement`, `Person`, `SplitType`,
-  `BalanceCalculator`, `Statistics`, `CategoryNormalizer`, `Money`, `LegacyCsvParser`.
+  `BalanceCalculator`, `Statistics`, `CategoryNormalizer`, `Money`, `LegacyCsvParser`, `Members`,
+  repository interfaces (`ExpenseRepository`, `SettlementRepository`).
 - `:app` – Compose + Material 3 UI, ViewModels exposing `StateFlow`, Koin DI (`di/AppModule.kt`).
-  Package `hr.ml.expensetracker`.
+  Package `hr.ml.expensetracker`. `data/` = Firestore mappers and repositories; `session/` =
+  Google sign-in, Firebase Auth and the `config/members` allow-list
+  (`SessionRepository.currentPerson` is the `createdBy` for new records).
+- `firestore.rules` + `firebase/rules-tests/` – security rules and their emulator tests. Field names
+  in the rules, `data/FirestoreMappers.kt` and the tests must stay in sync.
 - `tools/` – Python admin scripts. Their output goes to `private/`, never into git.
 - Versions: `gradle/libs.versions.toml`. compileSdk is locked at 36, which pins some AndroidX
   libraries one release behind (see the comment there).
@@ -51,5 +69,8 @@ python tools\export_legacy.py    # -> private\legacy_popis.csv, private\legacy_c
 - New domain logic gets JUnit 5 tests in `:domain` with synthetic fixtures. Tests using real data
   read from `private/` and must skip (JUnit `Assumptions`) when it is absent.
 - No secrets or personal data in git: `private/`, `google-services.json`, `local.properties`,
-  keystores are gitignored; commit `*.example` files instead.
+  keystores are gitignored; commit `*.example` files instead. That includes
+  `private/members.json` and `private/serviceAccountKey.json`; never put real member emails in
+  code, tests or docs.
+- Repository writes are fire-and-forget (offline-first); snapshot listeners show them at once.
 - Each stage is one reviewed commit on `main`; CI (`.github/workflows/android.yml`) must be green.

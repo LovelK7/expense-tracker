@@ -7,6 +7,9 @@ kotlin {
 }
 
 dependencies {
+    // Repository interfaces expose kotlinx.coroutines Flow.
+    api(libs.kotlinx.coroutines.core)
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlin.test)

@@ -1,6 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    // Reads app/google-services.json (gitignored; CI copies google-services.json.example).
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -39,6 +41,14 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.play.services)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
@@ -51,4 +61,5 @@ dependencies {
     implementation(libs.koin.androidx.compose)
 
     testImplementation(libs.junit4)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
