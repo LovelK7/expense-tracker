@@ -169,4 +169,116 @@
         <item>stu</item>
         <item>pro</item>
     </string-array>
+    <!-- Statistika, Stage 9: inner tabs Brojke | Trendovi | Navike -->
+    <string name="stats_tab_numbers">Brojke</string>
+    <string name="stats_tab_trends">Trendovi</string>
+    <string name="stats_tab_habits">Navike</string>
+    <string name="range_12">12 mj</string>
+    <string name="range_24">24 mj</string>
+    <string name="range_all">Sve</string>
+    <!-- Whole euros on chart labels: "1.234 €" -->
+    <string name="euro_whole">%1$s €</string>
+    <string name="trends_monthly_title">Mjesečna potrošnja</string>
+    <string name="trends_monthly_subtitle">€ po mjesecu i prosjek zadnja 3 mjeseca</string>
+    <string name="series_spending">Potrošnja</string>
+    <string name="series_rolling">Prosjek 3 mj</string>
+    <string name="trends_monthly_description">Linijski graf mjesečne potrošnje s tromjesečnim prosjekom</string>
+    <string name="trends_categories_title">Po kategorijama kroz vrijeme</string>
+    <string name="trends_categories_subtitle">€ po mjesecu: šest najvećih kategorija i ostalo</string>
+    <string name="trends_categories_description">Naslagani stupci potrošnje po kategorijama za svaki mjesec</string>
+    <string name="trends_multiples_title">Kategorije pojedinačno</string>
+    <string name="trends_multiples_subtitle">Osam najvećih kategorija u razdoblju, svaka u svom mjerilu</string>
+    <string name="trends_multiple_description">Mjesečna potrošnja za kategoriju %1$s</string>
+    <string name="trends_cumulative_title">Kumulativno po godinama</string>
+    <string name="trends_cumulative_subtitle">Potrošnja od 1. siječnja do kraja svakog mjeseca, €. Godine iz razdoblja prikazane su cijele.</string>
+    <string name="trends_cumulative_description">Linije kumulativne potrošnje za svaku godinu</string>
+    <string name="trends_payers_title">Tko plaća</string>
+    <string name="trends_payers_subtitle">Plaćeno po mjesecu, €</string>
+    <string name="trends_payers_person_subtitle">Plaćeno i udio (koliko otpada na osobu) po mjesecu, €</string>
+    <string name="series_paid">Plaćeno</string>
+    <string name="series_share">Udio</string>
+    <string name="trends_payers_description">Linije plaćenih iznosa po mjesecu</string>
+    <string name="habits_tile_monthly">Prosjek mjesečno</string>
+    <string name="habits_tile_median">Medijan troška</string>
+    <string name="habits_tile_per_week">Troškova tjedno</string>
+    <string name="habits_tile_between">Prosječni razmak</string>
+    <string name="habits_tile_gap">Najduže bez troška</string>
+    <string name="habits_tile_busiest">Najskuplji dan</string>
+    <string name="day_count_one">%1$d dan</string>
+    <string name="day_count_few">%1$d dana</string>
+    <string name="day_count_many">%1$d dana</string>
+    <!-- "1,6 dana" (a decimal number of days) -->
+    <string name="days_decimal">%1$s dana</string>
+    <string name="habits_between_detail">između dana s troškom</string>
+    <string name="habits_per_week_detail">%1$s u razdoblju</string>
+    <string name="date_range">%1$s – %2$s</string>
+    <!-- "1.–18. travnja 2026.", "28. ožujka – 3. travnja 2026." -->
+    <string name="date_range_same_month">%1$d.–%2$d. %3$s %4$d.</string>
+    <string name="date_range_same_year">%1$d. %2$s – %3$d. %4$s %5$d.</string>
+    <string name="none">—</string>
+    <string name="habits_frequency_title">Koliko često</string>
+    <string name="habits_frequency_subtitle">Broj troškova po mjesecu</string>
+    <string name="habits_frequency_description">Stupci broja troškova po mjesecu</string>
+    <string name="habits_average_title">Prosječan iznos troška</string>
+    <string name="habits_average_subtitle">€ po trošku, po mjesecu</string>
+    <string name="habits_average_description">Linija prosječnog iznosa troška po mjesecu</string>
+    <string name="series_average">po trošku</string>
+    <string name="habits_weekdays_title">Dani u tjednu</string>
+    <string name="habits_weekdays_subtitle">Udio potrošnje po danu u tjednu</string>
+    <string name="habits_weekdays_description">Stupci udjela potrošnje po danu u tjednu</string>
+    <string name="habits_weekday_count_title">Prosječan broj troškova na taj dan</string>
+    <string name="habits_weekday_count_description">Stupci prosječnog broja troškova po danu u tjednu</string>
+    <string-array name="weekdays_short">
+        <item>Pon</item>
+        <item>Uto</item>
+        <item>Sri</item>
+        <item>Čet</item>
+        <item>Pet</item>
+        <item>Sub</item>
+        <item>Ned</item>
+    </string-array>
+    <string-array name="weekdays_full">
+        <item>Ponedjeljak</item>
+        <item>Utorak</item>
+        <item>Srijeda</item>
+        <item>Četvrtak</item>
+        <item>Petak</item>
+        <item>Subota</item>
+        <item>Nedjelja</item>
+    </string-array>
+    <string name="series_share_of_spending">potrošnje</string>
+    <string name="series_per_day">troškova prosječno</string>
+    <string name="habits_day_of_month_title">Dan u mjesecu</string>
+    <string name="habits_day_of_month_subtitle">Prosječna potrošnja na taj dan u mjesecu, €</string>
+    <string name="habits_day_of_month_description">Stupci prosječne potrošnje po danu u mjesecu</string>
+    <!-- "5. u mjesecu" -->
+    <string name="day_of_month">%1$d. u mjesecu</string>
+    <string name="series_average_day">prosječno</string>
+    <string name="habits_calendar_title">Kalendar potrošnje</string>
+    <string name="habits_calendar_subtitle">Dnevna potrošnja, zadnjih 12 mjeseci</string>
+    <string name="habits_calendar_description">Kalendar dnevne potrošnje, tamnije je više</string>
+    <string name="heatmap_none">bez troška</string>
+    <string name="heatmap_up_to">do %1$s</string>
+    <string name="heatmap_above">više od %1$s</string>
+    <string name="habits_histogram_title">Raspodjela iznosa</string>
+    <string name="habits_histogram_subtitle">Broj troškova po iznosu, €</string>
+    <string name="habits_histogram_description">Histogram iznosa troškova s označenim medijanom</string>
+    <string name="habits_median_marker">medijan %1$s</string>
+    <!-- "10–25 €", "500+ €" -->
+    <string name="bucket_open">%1$s+</string>
+    <string name="bucket_range_euro">%1$s–%2$s €</string>
+    <string name="bucket_open_euro">%1$s+ €</string>
+    <string name="habits_quarters_title">Udio kategorija po kvartalima</string>
+    <string name="habits_quarters_subtitle">Udio u potrošnji tromjesečja: šest najvećih kategorija i ostalo</string>
+    <string name="habits_quarters_description">Stupci udjela kategorija u potrošnji po tromjesečju</string>
+    <!-- "Q3", "Q3 2025." -->
+    <string name="quarter_short">Q%1$d</string>
+    <string name="quarter_label">Q%1$d %2$d.</string>
+    <string name="habits_top_title">Najčešći troškovi</string>
+    <string name="habits_top_subtitle">Deset najčešćih opisa (bez obzira na velika slova i dijakritike)</string>
+    <string name="habits_top_count">puta</string>
+    <string name="habits_top_total">ukupno</string>
+    <!-- "Hrana · prosjek 31,20 €" -->
+    <string name="habits_top_detail">%1$s · prosjek %2$s</string>
+    <string name="habits_top_empty">Troškovi u razdoblju nemaju opis.</string>
 </resources>

@@ -2,30 +2,66 @@ package hr.ml.expensetracker.ui.stats
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import hr.ml.expensetracker.domain.Analytics
+import hr.ml.expensetracker.domain.AnalyticsRange
 import hr.ml.expensetracker.domain.CategoryTrend
 import hr.ml.expensetracker.domain.Expense
 import hr.ml.expensetracker.domain.ExpenseRepository
+import hr.ml.expensetracker.domain.Habits
+import hr.ml.expensetracker.domain.HabitsReport
 import hr.ml.expensetracker.domain.PeriodComparison
 import hr.ml.expensetracker.domain.Percent
 import hr.ml.expensetracker.domain.Person
 import hr.ml.expensetracker.domain.Statistics
 import hr.ml.expensetracker.domain.Trends
+import hr.ml.expensetracker.domain.TrendsReport
 import java.time.Clock
 import java.time.LocalDate
 import java.time.YearMonth
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 
 enum class StatsMode { MONTH, YEAR, ALL }
+
+/** The Statistika tab's inner tabs: the Stage 8 figures, time series and spending habits. */
+enum class StatsTab { NUMBERS, TRENDS, HABITS }
+
+/** What Trendovi and Navike show: their own range and the person shared with Brojke. */
+data class AnalyticsSelection(val range: AnalyticsRange = AnalyticsRange.MONTHS_24, val person: Person? = null)
+
+/** The Trendovi tab. [report] is null without any data; it is kept while a new one is computed. */
+data class TrendsUiState(
+    val loading: Boolean = true,
+    val error: Boolean = false,
+    val selection: AnalyticsSelection = AnalyticsSelection(),
+    val report: TrendsReport? = null,
+) {
+    val empty: Boolean get() = !loading && !error && (report == null || report.totalCents == 0L)
+}
+
+/** The Navike tab; like [TrendsUiState]. */
+data class HabitsUiState(
+    val loading: Boolean = true,
+    val error: Boolean = false,
+    val selection: AnalyticsSelection = AnalyticsSelection(),
+    val report: HabitsReport? = null,
+) {
+    val empty: Boolean get() = !loading && !error && (report == null || report.tiles.expenseCount == 0)
+}
 
 /** "Po mjesecima" in the Sve mode stops after this many months (newest first). */
 const val ALL_TIME_MONTHS = 24
@@ -148,10 +184,13 @@ private val NEWEST_FIRST = compareByDescending<Expense> { it.date }.thenByDescen
 
 /**
  * The "Statistika" tab (the legacy "PIVOT" sheet): totals per category, per month, per year and
- * per person for a month, a year or all time, with period comparisons and category trends.
- * Settlements and transfers ("Prijenos") are not spending and are not part of it.
- * Everything is recomputed on [computeDispatcher], once per change of the expenses, the selection
- * or the expanded categories.
+ * per person for a month, a year or all time, with period comparisons and category trends
+ * ([state], inner tab Brojke), plus the Trendovi ([trends]) and Navike ([habits]) analytics over
+ * the last 12 or 24 months or everything. Settlements and transfers ("Prijenos") are not spending
+ * and are not part of it. The person selection is shared by all three inner tabs.
+ * Everything is recomputed on [computeDispatcher]: [state] once per change of the expenses, the
+ * selection or the expanded categories; [trends] and [habits] only when the expenses, the
+ * analytics range or the person change (they start with the first look at their tab).
  */
 class StatisticsViewModel(
     expenses: ExpenseRepository,
@@ -160,9 +199,49 @@ class StatisticsViewModel(
 ) : ViewModel() {
     private val selection = MutableStateFlow(StatsSelection(StatsMode.MONTH, YearMonth.now(clock)))
     private val expanded = MutableStateFlow<Set<String>>(emptySet())
+    private val tab = MutableStateFlow(StatsTab.NUMBERS)
+    private val range = MutableStateFlow(AnalyticsRange.MONTHS_24)
+
+    /**
+     * One repository listener for all three inner tabs. A load error is shared as a value and
+     * rethrown downstream, so each state's `catch` reports it (shareIn would swallow it).
+     */
+    private val allExpenses: Flow<List<Expense>> = expenses.observeAll()
+        .map { Result.success(it) }
+        .catch { emit(Result.failure(it)) }
+        .shareIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), replay = 1)
+        .map { it.getOrThrow() }
+
+    /** The selected inner tab; kept here so it survives switching bottom tabs and rotation. */
+    val selectedTab: StateFlow<StatsTab> = tab.asStateFlow()
+
+    val analyticsSelection: StateFlow<AnalyticsSelection> =
+        combine(range, selection) { r, s -> AnalyticsSelection(r, s.person) }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, AnalyticsSelection(range.value, selection.value.person))
+
+    private val analyticsInputs = combine(allExpenses, analyticsSelection) { all, sel -> all to sel }
+        .distinctUntilChanged()
+
+    val trends: StateFlow<TrendsUiState> = analyticsInputs
+        .map { (all, sel) ->
+            TrendsUiState(loading = false, selection = sel, report = Analytics.trends(all, sel.range, LocalDate.now(clock), sel.person))
+        }
+        .conflate()
+        .flowOn(computeDispatcher)
+        .catch { emit(TrendsUiState(loading = false, error = true, selection = analyticsSelection.value)) }
+        .stateIn(viewModelScope, SharingStarted.Lazily, TrendsUiState(selection = analyticsSelection.value))
+
+    val habits: StateFlow<HabitsUiState> = analyticsInputs
+        .map { (all, sel) ->
+            HabitsUiState(loading = false, selection = sel, report = Habits.habits(all, sel.range, LocalDate.now(clock), sel.person))
+        }
+        .conflate()
+        .flowOn(computeDispatcher)
+        .catch { emit(HabitsUiState(loading = false, error = true, selection = analyticsSelection.value)) }
+        .stateIn(viewModelScope, SharingStarted.Lazily, HabitsUiState(selection = analyticsSelection.value))
 
     val state: StateFlow<StatsUiState> =
-        combine(expenses.observeAll(), selection, expanded, ::compute)
+        combine(allExpenses, selection, expanded, ::compute)
             .conflate()
             .flowOn(computeDispatcher)
             .catch { emit(StatsUiState(loading = false, error = true, selection = selection.value)) }
@@ -177,8 +256,17 @@ class StatisticsViewModel(
         }
     }
 
-    /** Whose spending is shown: one person's payments, or both (null). */
+    /** Whose spending is shown: one person's payments, or both (null). Applies to all inner tabs. */
     fun setPerson(person: Person?) = selection.update { it.copy(person = person) }
+
+    fun setTab(tab: StatsTab) {
+        this.tab.value = tab
+    }
+
+    /** The span of Trendovi and Navike (the Mjesec/Godina/Sve period does not apply to them). */
+    fun setRange(range: AnalyticsRange) {
+        this.range.value = range
+    }
 
     fun previous() {
         if (state.value.canGoPrevious) selection.update { it.shifted(-1) }

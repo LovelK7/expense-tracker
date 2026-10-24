@@ -5,6 +5,8 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import java.io.File
+import java.time.LocalDate
+import java.time.YearMonth
 import kotlin.math.abs
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -89,6 +91,47 @@ class LegacyGoldenTest {
         assertEquals(listOf(2026, 2025, 2024, 2023), years.map { it.year })
         assertEquals(all.totalCents, years.sumOf { it.cents })
         assertEquals(listOf(10, 12, 12, 12), years.map { it.months })
+    }
+
+    @Test
+    fun `analytics over the full history add up to the spending total`() {
+        val today = expenses.maxOf { it.date } // 2026-10-24
+        val all = Statistics.compute(expenses, expenses.minOf { it.date }, today)
+        val trends = Analytics.trends(expenses, AnalyticsRange.ALL, today)!!
+        assertEquals(MonthWindow(YearMonth.of(2023, 1), YearMonth.of(2026, 10)), trends.window)
+        assertEquals(46, trends.monthly.size)
+        assertEquals(all.totalCents, trends.totalCents)
+        assertEquals(all.totalCents, trends.categoryStack.columns.sumOf { it.totalCents })
+        assertEquals(Analytics.STACK_CATEGORIES + 1, trends.categoryStack.categories.size)
+        assertEquals(listOf(2023, 2024, 2025, 2026), trends.cumulativeByYear.map { it.year })
+        assertEquals(all.totalCents, trends.cumulativeByYear.sumOf { it.totalCents })
+        assertEquals(all.totalCents, trends.payers.paid.values.sumOf { s -> s.sumOf { it.cents } })
+        assertEquals(all.totalCents, trends.payers.share.values.sumOf { s -> s.sumOf { it.cents } })
+
+        val habits = Habits.habits(expenses, AnalyticsRange.ALL, today)!!
+        assertEquals(all.expenseCount, habits.tiles.expenseCount)
+        assertEquals(all.expenseCount, habits.histogram.sumOf { it.count })
+        assertEquals(all.expenseCount, habits.activity.sumOf { it.count })
+        assertEquals(all.totalCents, habits.weekdays.sumOf { it.cents })
+        assertEquals(all.totalCents, habits.daysOfMonth.sumOf { it.cents })
+        assertEquals(all.totalCents, habits.quarterStack.columns.sumOf { it.totalCents })
+        // Hand-checked against private/legacy_popis.csv (tools-independent count in Python).
+        assertEquals(2_743, habits.tiles.medianCents)
+        assertEquals(listOf(129, 350, 247, 155, 97, 30, 29), habits.histogram.map { it.count })
+        assertEquals(23, habits.activity.single { it.month == YearMonth.of(2025, 3) }.count)
+        assertEquals(DayTotal(LocalDate.of(2024, 6, 7), 143_000), habits.tiles.busiestDay)
+        assertEquals("Kaufland", habits.topDescriptions.first().label)
+        assertEquals(88, habits.topDescriptions.first().count)
+
+        val recent = Habits.habits(expenses, AnalyticsRange.MONTHS_24, today)!!
+        assertEquals(519, recent.tiles.expenseCount)
+        assertEquals(3_500, recent.tiles.medianCents)
+        val calendarFrom = recent.calendar.first
+        assertEquals(LocalDate.of(2025, 10, 25), calendarFrom)
+        assertEquals(
+            expenses.filter { Statistics.isSpending(it) && !it.date.isBefore(calendarFrom) }.sumOf { it.amountCents },
+            recent.calendar.days.sum(),
+        )
     }
 
     private fun findRepoRoot(): File? =

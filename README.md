@@ -42,7 +42,11 @@ filtered list.
 
 ### Statistika
 
-The "Statistika" tab mirrors the legacy PIVOT sheet. Pick **Mjesec**, **Godina** or **Sve** and
+Statistika has three inner tabs under the top bar: **Brojke** (the figures below), **Trendovi**
+and **Navike** (charts, see "Trendovi and Navike"). **Oboje | Lovel | Marina** applies to all
+three; the inner tab, the person and the range survive switching tabs and rotating the phone.
+
+The Brojke tab mirrors the legacy PIVOT sheet. Pick **Mjesec**, **Godina** or **Sve** and
 step through months or years with the arrows (from the earliest to the latest expense; the
 current month is the default). Periods are by the expense date; deleted expenses and settlements
 are not counted. It shows the period total, each person's share (half of every shared expense
@@ -61,6 +65,33 @@ godinama": each year's total and monthly average. **Oboje | Lovel | Marina** bel
 switches to one person's payments: the total becomes what that person paid, with the number of
 expenses and their share of the couple's spending. The rules are in
 [`docs/DESIGN.md`](docs/DESIGN.md), "Statistics rules".
+
+#### Trendovi and Navike
+
+Both ignore the Mjesec/Godina/Sve period and have their own range: **12 mj | 24 mj | Sve**
+(default 24 months, ending with the current month). Transfers are left out as in Brojke; with a
+person selected every chart covers what that person paid. Tap or drag across any chart to read
+the value at a point (shown above the chart, the point gets a marker); by default the latest
+month (or day) is shown.
+
+- **Trendovi**: monthly spending as a line with its 3-month rolling average (dashed); a stacked
+  column per month for the six largest categories of the range plus "Ostalo"; small multiples
+  for the eight largest categories (total, monthly average and a sparkline each); cumulative
+  spending per calendar year, January to December, one line per year so years can be compared
+  (every year the range touches is drawn in full); and "Tko plaća": what Lovel and Marina paid
+  per month (in a person view: what that person paid next to their share, "Udio").
+- **Navike**: headline tiles (average per month, median expense, expenses per week, average gap
+  between days with spending, the longest stretch without spending and the most expensive day);
+  the number of expenses per month and, as a separate chart, the average amount per expense;
+  the share of spending per weekday and the average number of expenses per weekday; the average
+  spending per day of the month (rent days stand out); a calendar heatmap of daily spending for
+  the last 12 months; a histogram of expense amounts (0–10, 10–25, 25–50, 50–100, 100–250,
+  250–500, 500+ €) with the median marked; the category mix per quarter as 100 % columns; and
+  the ten most frequent descriptions (case and diacritics folded) with count, total and average.
+
+The numbers come from `Analytics` and `Habits` in `:domain`; the charts are plain Compose
+`Canvas` composables in `ui/charts/` (no chart library). Colours, chart order and the reasoning
+behind them are in [`docs/DESIGN.md`](docs/DESIGN.md), "Analytics rules (Stage 9)".
 
 ### Design
 

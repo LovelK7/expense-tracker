@@ -23,6 +23,7 @@ multi-currency, no friends list. Shared expenses only; private spending is out o
 | Repo | Public GitHub repo. Secrets and private data gitignored (`private/`, `google-services.json`, `local.properties`, `*.jks`, `*.keystore`). Example files committed instead. |
 | Distribution | Signed APK attached to GitHub Releases, sideloaded. No Play Store for the MVP. |
 | Visual style (Stage 6) | Own palette, no wallpaper-based dynamic colour: warm off-white / warm near-black, deep teal primary, amber secondary, muted rose tertiary. Outfit (headlines, amounts) and Inter (body), bundled, tabular figures. One icon and colour per category (`ui/common/CategoryVisuals`). The balance card is teal when the signed-in person is owed, rose when they owe, neutral when settled. |
+| Charts (Stage 9) | Compose `Canvas` composables in `ui/charts/`, no chart library. Vico was the preferred option, but its newest 2.x (2.5.2) needs compileSdk 37 (core-ktx 1.19) and fails `checkDebugAarMetadata`; 2.5.1 builds but scales column thickness with zoom, has no stacked-segment gaps or end labels and pulls in appcompat. Charts take plain data (domain reports or small chart data classes), never a ViewModel. |
 
 ## Domain model
 
@@ -120,6 +121,82 @@ formats them.
 - The Sve range runs from the earliest to the latest non-deleted expense of either person,
   transfers included, so it does not change with the person selection.
 
+## Analytics rules (Stage 9)
+
+Statistika has three inner tabs: **Brojke** (Stage 8, unchanged), **Trendovi** and **Navike**.
+All numbers are computed in `:domain` (`Analytics`, `Habits`), pure and unit tested, with the
+Stage 8 filters: no deleted expenses, no transfers ("Prijenos"), with a person only what that
+person paid. The person selection is shared by all three inner tabs; the inner tab, the person
+and the range live in `StatisticsViewModel` (one repository listener; Trendovi and Navike are
+computed on `Dispatchers.Default` only when the expenses, the range or the person change).
+
+- **Range** ("12 mj | 24 mj | Sve", default 24 mj; the Mjesec/Godina/Sve period does not apply):
+  calendar months ending with the later of today's month and the month of the latest non-deleted
+  expense; 12/24 months back but not before the month of the earliest non-deleted expense (Sve
+  starts there). Transfers count for the range, so it does not change with the person.
+- **Money** is cents; every average is rounded half-even on cents. Ratios that are not money
+  (expenses per week, days between) are shown with one decimal.
+- **Mjesečna potrošnja**: spending per month (zero-filled) and a 3-month trailing average: the
+  month and the two before it, using months before the range when they exist, but no month
+  before the first month with spending (so the first months average over 1 or 2 months).
+- **Stacked categories** (per month in Trendovi, per quarter as 100 % columns in Navike): the six
+  largest categories of the range by total (ties by name) plus "Ostalo" for everything else when
+  that is not zero. The real category "Ostalo" never takes one of the six places; it is part of
+  the folded "Ostalo". Quarters are those overlapping the range (the first and last can be
+  partial).
+- **Kategorije pojedinačno**: the eight largest categories (the real "Ostalo" included), each with
+  its total and monthly average over the range's months from the first month with spending on.
+- **Kumulativno po godinama**: every calendar year the range touches (at most the newest six), in
+  full: January to December, the range's last year to its last month; each point is the year's
+  spending up to the end of that month.
+- **Tko plaća**: paid per person and month over both people's spending, and each person's share
+  per month (the Stage 8 share rule applied per month: HALF sums halved half-even, Lovel gets the
+  rounded half). Oboje shows both people's payments; a person view shows that person's payments
+  and their share ("Udio", dashed).
+- **Observed days** (Navike): from the range's first day (or the first spending day, when later)
+  to its last day (or the later of today and the last spending day, when earlier).
+- **Tiles**: average per month (as above); median expense (the middle amount, or the half-even
+  mean of the two middle ones); expenses per week = count × 7 / observed days; average gap =
+  (last − first spending day) / (days with spending − 1); the longest run of days without
+  spending between two spending days (with its dates); the most expensive day (the earliest of
+  equal days).
+- **Koliko često**: expenses per month and, as a separate chart (never a second axis), the
+  average amount per expense (months without expenses have no point).
+- **Dani u tjednu / Dan u mjesecu**: per weekday the share of spending and the expenses divided
+  by how often that weekday occurs in the observed days; per day of the month the spending
+  divided by how often that day occurs (the 31st only in long months).
+- **Kalendar potrošnje**: the last 12 months of the observed days (from the day after the same
+  date a year earlier); a day's level is 0 without spending, otherwise 1–5 by four thresholds:
+  the 20/40/60/80th percentiles (nearest rank) of the days with spending, rounded half-even to
+  whole euros.
+- **Raspodjela iznosa**: fixed half-open buckets 0–10, 10–25, 25–50, 50–100, 100–250, 250–500 and
+  500+ €, with the median marked.
+- **Najčešći troškovi**: the ten most frequent non-blank descriptions, grouped by
+  `SearchText.fold` with inner whitespace collapsed; shown with the most used spelling and
+  category (ties: the most recent), count, total and average; ordered by count, total, label.
+
+**Chart conventions** (the dataviz rules): one y-axis per chart from 0 with clean ticks, solid
+hairline grid; lines 2 dp, a derived line (rolling average, share) 1.5 dp dashed; columns at most
+24 dp with at least 2 dp between them, stacked segments separated by a 2 dp surface gap, the top
+rounded; a 10 dp marker with a 2 dp surface ring on the selected point; a legend for two or more
+series (category legends with the icon); direct labels only at line ends, dropped when they would
+collide; text always in the text colours. Every chart has a tap/drag read-out above it (values
+first). No pie charts.
+
+**Colours**: categorical colour follows the category (`CategoryVisuals`). Multi-series category
+charts draw the categories in the fixed `CategoryVisuals.CHART_ORDER` (stack bottom to top and
+legend order; "Ostalo" grey always last), an order chosen with the dataviz palette validator. In
+Stage 9 the category hues were re-stepped within their hue families so that the stacks the real
+history produces (every range × person) pass the validator's adjacent-pair gates in both themes
+(OKLab ΔE ≥ 8 under protan/deutan simulation, ≥ 15 for normal vision, lightness band, chroma
+floor, 3:1 against the card); the dark set now sits in the dark lightness band (OKLCH L
+0.48–0.67) instead of the former pastels. Rare categories (Zdravlje, Poklon, Usluge, …) that have
+never been in a top six rely on the 2 dp gaps, the legend and the read-out. Single-series charts
+use the primary teal. Years (cumulative chart) take slot `floorMod(2026 − year, 6)` of a
+validated six-hue order, so a year keeps its colour; "Tko plaća" uses a validated teal/rose pair
+for Lovel/Marina. The heatmap uses a one-hue teal ramp of five steps (light: light to dark; dark
+theme: dim to bright), validated as an ordinal ramp, with a neutral cell for days without spending.
+
 ## Screens (MVP)
 
 1. **Dodaj trošak** (add expense): amount, category chips, optional description, payer toggle
@@ -137,6 +214,11 @@ formats them.
 3. **Statistika** (stats): month/year picker, per-category totals, monthly trend, per-person half.
    Stage 8 (see "Statistics rules"): transfers excluded, period comparisons, a 12-month trend per
    expanded category, "Po godinama" in Sve, and a person view (Oboje | Lovel | Marina).
+   Stage 9 (see "Analytics rules"): inner tabs Brojke (all of the above) | Trendovi (monthly line
+   with rolling average, stacked categories per month, small multiples, cumulative years, who
+   pays) | Navike (tiles, frequency, weekdays, day of month, calendar heatmap, amount histogram,
+   category mix per quarter, most frequent descriptions), with their own range 12 mj | 24 mj | Sve.
+   Početna's rows keep the description and the payer line to one line each (ellipsis).
 
 Deferred (v2 backlog): recurring rent template, home-screen quick-add widget, receipt photos,
 budgets, custom split ratios, push notifications, web dashboard.

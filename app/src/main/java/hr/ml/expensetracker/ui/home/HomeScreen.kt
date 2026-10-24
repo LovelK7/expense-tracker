@@ -429,11 +429,14 @@ private fun ExpenseRow(expense: Expense, shape: Shape, onClick: () -> Unit, onDe
     var menuOpen by remember { mutableStateOf(false) }
     ListItem(
         leadingContent = { CategoryBadge(expense.category) },
-        headlineContent = { Text(expense.category, style = MaterialTheme.typography.titleMedium) },
+        headlineContent = {
+            Text(expense.category, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
         supportingContent = {
+            // One line each, also with a large font scale: the amount column stays put.
             Column {
                 if (expense.description.isNotBlank()) {
-                    Text(expense.description, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(expense.description, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Text(
                     text = stringResource(
@@ -447,6 +450,8 @@ private fun ExpenseRow(expense: Expense, shape: Shape, onClick: () -> Unit, onDe
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         },
@@ -483,9 +488,11 @@ private fun SettlementRow(settlement: Settlement, shape: Shape, onDelete: () -> 
                         stringResource(settlement.from.label),
                         stringResource(settlement.to.label),
                     ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 if (settlement.note.isNotBlank()) {
-                    Text(settlement.note, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
+                    Text(settlement.note, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
                 }
             }
         },

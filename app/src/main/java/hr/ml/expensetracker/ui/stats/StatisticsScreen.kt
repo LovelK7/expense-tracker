@@ -26,9 +26,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -51,6 +53,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import hr.ml.expensetracker.R
+import hr.ml.expensetracker.domain.AnalyticsRange
 import hr.ml.expensetracker.domain.Expense
 import hr.ml.expensetracker.domain.Money
 import hr.ml.expensetracker.domain.Percent
@@ -89,21 +92,77 @@ object StatsTags {
 
     /** The person selector's button; null is "Oboje". */
     fun person(person: Person?) = "stats_person:${person?.name ?: "BOTH"}"
+
+    const val TILES = "stats_tiles"
+    const val TRENDS_LIST = "stats_trends_list"
+    const val HABITS_LIST = "stats_habits_list"
+
+    fun tab(tab: StatsTab) = "stats_tab:${tab.name}"
+
+    fun range(range: AnalyticsRange) = "stats_range:${range.name}"
+
+    /** A Trendovi/Navike chart card, e.g. "monthly", "calendar". */
+    fun card(name: String) = "stats_card:$name"
+
+    /** A stat tile's value, by its label. */
+    fun tile(label: String) = "stats_tile:$label"
+}
+
+/**
+ * Statistika: inner tabs Brojke (the Stage 8 figures for a month, a year or everything), Trendovi
+ * (time series) and Navike (spending habits). The person selection applies to all three.
+ */
+@Composable
+fun StatisticsScreen(modifier: Modifier = Modifier, viewModel: StatisticsViewModel = koinViewModel()) {
+    val tab by viewModel.selectedTab.collectAsStateWithLifecycle()
+    Column(modifier.fillMaxSize()) {
+        StatsTabRow(tab, viewModel::setTab)
+        when (tab) {
+            StatsTab.NUMBERS -> {
+                val state by viewModel.state.collectAsStateWithLifecycle()
+                StatisticsContent(
+                    state = state,
+                    onModeChange = viewModel::setMode,
+                    onPersonChange = viewModel::setPerson,
+                    onPrevious = viewModel::previous,
+                    onNext = viewModel::next,
+                    onToggleCategory = viewModel::toggleCategory,
+                )
+            }
+            StatsTab.TRENDS -> {
+                val state by viewModel.trends.collectAsStateWithLifecycle()
+                val selection by viewModel.analyticsSelection.collectAsStateWithLifecycle()
+                TrendsContent(state, selection, viewModel::setRange, viewModel::setPerson)
+            }
+            StatsTab.HABITS -> {
+                val state by viewModel.habits.collectAsStateWithLifecycle()
+                val selection by viewModel.analyticsSelection.collectAsStateWithLifecycle()
+                HabitsContent(state, selection, viewModel::setRange, viewModel::setPerson)
+            }
+        }
+    }
 }
 
 @Composable
-fun StatisticsScreen(modifier: Modifier = Modifier, viewModel: StatisticsViewModel = koinViewModel()) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
-    StatisticsContent(
-        state = state,
-        onModeChange = viewModel::setMode,
-        onPersonChange = viewModel::setPerson,
-        onPrevious = viewModel::previous,
-        onNext = viewModel::next,
-        onToggleCategory = viewModel::toggleCategory,
-        modifier = modifier,
-    )
+private fun StatsTabRow(selected: StatsTab, onSelect: (StatsTab) -> Unit) {
+    SecondaryTabRow(selectedTabIndex = selected.ordinal, containerColor = MaterialTheme.colorScheme.surface) {
+        StatsTab.entries.forEach { tab ->
+            Tab(
+                selected = tab == selected,
+                onClick = { onSelect(tab) },
+                text = { Text(stringResource(tab.label)) },
+                modifier = Modifier.testTag(StatsTags.tab(tab)),
+            )
+        }
+    }
 }
+
+private val StatsTab.label: Int
+    get() = when (this) {
+        StatsTab.NUMBERS -> R.string.stats_tab_numbers
+        StatsTab.TRENDS -> R.string.stats_tab_trends
+        StatsTab.HABITS -> R.string.stats_tab_habits
+    }
 
 @Composable
 private fun StatisticsContent(
@@ -254,9 +313,9 @@ private fun PeriodSelector(
 
 private val PERSON_CHOICES: List<Person?> = listOf(null) + Person.entries
 
-/** "Oboje | Lovel | Marina": whose spending the statistics cover. */
+/** "Oboje | Lovel | Marina": whose spending the statistics cover (all three inner tabs). */
 @Composable
-private fun PersonSelector(selected: Person?, onChange: (Person?) -> Unit) {
+internal fun PersonSelector(selected: Person?, onChange: (Person?) -> Unit) {
     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
         PERSON_CHOICES.forEachIndexed { index, person ->
             SegmentedButton(

@@ -54,6 +54,44 @@ object CategoryVisuals {
 
     fun of(category: String): Visual = BY_NAME[category] ?: FALLBACK
 
+    /**
+     * The fixed order of categories in a multi-series chart (stack bottom to top, legend order).
+     * Chosen with the dataviz palette validator so that the neighbours the real history produces
+     * stay apart in both themes, also for colour-blind readers (docs/DESIGN.md, "Analytics rules").
+     * Categories not listed follow alphabetically; "Ostalo" (the folded rest) always comes last.
+     */
+    val CHART_ORDER: List<String> = listOf(
+        "Režije",
+        "MPO",
+        "Potrepštine",
+        "Putovanja",
+        "Stanarina",
+        "Hrana",
+        "Odjeća i oprema",
+        "Adaptacija",
+        "Zabava",
+        "Hrana van",
+        "Prijevoz",
+        "Zdravlje",
+        "Poklon",
+        "Usluge",
+        "Banka",
+        "Kredit",
+        "Edukacija",
+        "Gotovina",
+        "Osiguranje",
+        "Prijenos",
+    )
+
+    private const val OTHER = "Ostalo"
+
+    /** [categories] in [CHART_ORDER]. */
+    fun chartOrder(categories: Collection<String>): List<String> = categories.sortedWith(
+        compareBy<String> { if (it == OTHER) 2 else if (it in CHART_ORDER) 0 else 1 }
+            .thenBy { CHART_ORDER.indexOf(it) }
+            .thenBy { it },
+    )
+
     @DrawableRes
     fun icon(category: String): Int = of(category).icon
 
