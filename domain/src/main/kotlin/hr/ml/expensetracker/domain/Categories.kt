@@ -31,7 +31,7 @@ object Categories {
         "Zdravlje",
     )
 
-    /** The most used legacy categories, most used first; the add form shows them before the rest. */
+    /** The most used legacy categories (at import time), most used first: the head of [FOR_PICKER]. */
     val MOST_USED: List<String> = listOf(
         "Hrana",
         "Prijevoz",
@@ -46,8 +46,25 @@ object Categories {
     /** Legacy-only: transfers are recorded as settlements from now on, so new expenses skip it. */
     const val LEGACY_TRANSFER = "Prijenos"
 
-    /** Categories offered for a new expense: [MOST_USED] first, then the rest in list order. */
+    /**
+     * Categories offered for a new expense in their static order: [MOST_USED] first, then the rest
+     * in list order. The add form shows them by real usage ([orderByUsage]); this order is the
+     * fallback without data and the tie-break.
+     */
     val FOR_PICKER: List<String> = MOST_USED + (DEFAULT - MOST_USED.toSet() - LEGACY_TRANSFER)
+
+    /**
+     * [categories] ordered by how many non-deleted [expenses] use each one (all time), most used
+     * first. Ties, including categories nobody has used, keep their order in [categories], so with
+     * no expenses the result is [categories] unchanged. Categories of [expenses] that are not in
+     * [categories] (e.g. "Prijenos" for the new-expense picker) are not added.
+     */
+    fun orderByUsage(expenses: List<Expense>, categories: List<String> = FOR_PICKER): List<String> {
+        if (expenses.isEmpty()) return categories
+        val counts = expenses.filterNot { it.deleted }.groupingBy { it.category }.eachCount()
+        // sortedByDescending is stable: equal counts stay in the order of [categories].
+        return categories.sortedByDescending { counts[it] ?: 0 }
+    }
 
     /** Legacy names that map onto a different canonical name. Keys are matched case-insensitively. */
     val DEFAULT_ALIASES: Map<String, String> = mapOf("Odjeća" to "Odjeća i oprema")

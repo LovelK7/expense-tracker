@@ -50,6 +50,14 @@ class LegacyGoldenTest {
     }
 
     @Test
+    fun `the add form's chips follow the legacy usage`() {
+        assertEquals(
+            listOf("Hrana", "Prijevoz", "Putovanja", "Režije", "Hrana van"),
+            Categories.orderByUsage(expenses).take(5),
+        )
+    }
+
+    @Test
     fun `statistics shares add up over the full history`() {
         val all = Statistics.compute(expenses, expenses.minOf { it.date }, expenses.maxOf { it.date })
         assertEquals(expenses.sumOf { it.amountCents }, all.totalCents)

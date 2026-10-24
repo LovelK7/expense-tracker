@@ -10,8 +10,11 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -19,6 +22,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +55,7 @@ import hr.ml.expensetracker.R
 import hr.ml.expensetracker.domain.Money
 import hr.ml.expensetracker.domain.Person
 import hr.ml.expensetracker.domain.SplitType
+import hr.ml.expensetracker.ui.common.CategoryVisuals
 import hr.ml.expensetracker.ui.common.DateField
 import hr.ml.expensetracker.ui.common.label
 import hr.ml.expensetracker.ui.theme.TroskoviTheme
@@ -60,6 +65,7 @@ import org.koin.androidx.compose.koinViewModel
 object ExpenseFormTags {
     const val AMOUNT = "expense_amount"
     const val SAVE = "expense_save"
+    const val CATEGORY_CHIP = "expense_category_chip"
 }
 
 /** The "Dodaj" tab: amount (focused, keyboard open), category, save. */
@@ -167,15 +173,16 @@ private fun ExpenseFormContent(
     // The save button stays above the keyboard: type the amount, tap a category, tap save.
     Column(modifier.fillMaxSize().imePadding()) {
         Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             OutlinedTextField(
                 value = state.amountText,
                 onValueChange = onAmountChange,
                 label = { Text(stringResource(R.string.amount_label)) },
                 suffix = { Text(stringResource(R.string.euro_suffix)) },
-                textStyle = MaterialTheme.typography.headlineSmall,
+                textStyle = MaterialTheme.typography.headlineMedium,
+                shape = MaterialTheme.shapes.medium,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
@@ -185,14 +192,10 @@ private fun ExpenseFormContent(
             SectionLabel(R.string.category_label)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(0.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 state.categories.forEach { category ->
-                    FilterChip(
-                        selected = category == state.category,
-                        onClick = { onCategorySelect(category) },
-                        label = { Text(category) },
-                    )
+                    CategoryChip(category, selected = category == state.category, onClick = { onCategorySelect(category) })
                 }
             }
 
@@ -201,6 +204,7 @@ private fun ExpenseFormContent(
                 onValueChange = onDescriptionChange,
                 label = { Text(stringResource(R.string.description_label)) },
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -242,17 +246,51 @@ private fun ExpenseFormContent(
         Button(
             onClick = onSave,
             enabled = state.canSave,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag(ExpenseFormTags.SAVE),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 10.dp)
+                .height(52.dp)
+                .testTag(ExpenseFormTags.SAVE),
         ) {
             Text(
-                if (cents != null && cents > 0) {
+                text = if (cents != null && cents > 0) {
                     stringResource(R.string.save_amount, Money.format(cents))
                 } else {
                     stringResource(R.string.save)
                 },
+                style = MaterialTheme.typography.titleMedium,
             )
         }
     }
+}
+
+/** A filled tonal pill with the category icon; selected, it takes the category colour. */
+@Composable
+private fun CategoryChip(category: String, selected: Boolean, onClick: () -> Unit) {
+    val tint = CategoryVisuals.tint(category)
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(category) },
+        leadingIcon = {
+            Icon(
+                painterResource(CategoryVisuals.icon(category)),
+                contentDescription = null,
+                modifier = Modifier.size(FilterChipDefaults.IconSize),
+            )
+        },
+        shape = CircleShape,
+        border = null,
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            labelColor = MaterialTheme.colorScheme.onSurface,
+            iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            selectedContainerColor = CategoryVisuals.container(category),
+            selectedLabelColor = MaterialTheme.colorScheme.onSurface,
+            selectedLeadingIconColor = tint,
+        ),
+        modifier = Modifier.height(36.dp).testTag(ExpenseFormTags.CATEGORY_CHIP),
+    )
 }
 
 @Composable
@@ -268,7 +306,7 @@ private fun SectionLabel(@StringRes text: Int) {
 @Composable
 private fun ExpenseFormPreview() {
     val today = LocalDate.of(2026, 10, 24)
-    TroskoviTheme(dynamicColor = false) {
+    TroskoviTheme {
         ExpenseFormContent(
             state = ExpenseFormState(amountText = "12,5", category = "Hrana", date = today, today = today),
             onAmountChange = {},

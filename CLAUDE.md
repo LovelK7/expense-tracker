@@ -77,7 +77,9 @@ Never test the data scripts against the real project; use the emulator (`--emula
   Google sign-in, Firebase Auth and the `config/members` allow-list
   (`SessionRepository.currentPerson`, injected as `CurrentPerson`, is the `createdBy` for new
   records). `ui/` = `AppShell` (tabs + the expense editor overlay), `home/`, `expense/` (add/edit
-  form), `stats/` (Statistika: stats computed on `Dispatchers.Default`), `common/`. ViewModels of the signed-in screens live in `SessionViewModel.memberViewModels`
+  form), `stats/` (Statistika: stats computed on `Dispatchers.Default`), `common/` (incl. `CategoryVisuals`:
+  icon + colour per category), `theme/` (fixed light/dark palette, `AppTheme.colors` extras,
+  Outfit/Inter typography; use the theme styles, no font families or colours hardcoded in screens). ViewModels of the signed-in screens live in `SessionViewModel.memberViewModels`
   and are cleared when the member signs out.
 - `app/src/debug` vs `app/src/release`: `dev/DevEnvironment` (Firebase emulators + dev sign-in,
   debug only, behind `BuildConfig.USE_FIREBASE_EMULATORS`; a no-op in release).

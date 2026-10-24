@@ -1,14 +1,18 @@
 package hr.ml.expensetracker.ui
 
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import hr.ml.expensetracker.domain.Categories
+import hr.ml.expensetracker.domain.Expense
 import hr.ml.expensetracker.domain.ExpenseRepository
 import hr.ml.expensetracker.domain.Money
 import hr.ml.expensetracker.domain.Person
@@ -19,9 +23,11 @@ import hr.ml.expensetracker.testing.InMemoryExpenseRepository
 import hr.ml.expensetracker.testing.InMemorySettlementRepository
 import hr.ml.expensetracker.ui.expense.ExpenseFormTags
 import hr.ml.expensetracker.ui.theme.TroskoviTheme
+import java.time.Instant
 import java.time.LocalDate
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -57,7 +63,7 @@ class AddExpenseFlowTest {
     @Test
     fun addAnExpenseInThreeTaps() {
         compose.setContent {
-            TroskoviTheme(dynamicColor = false) { AppShell(person = Person.LOVEL, onSignOut = {}) }
+            TroskoviTheme { AppShell(person = Person.LOVEL, onSignOut = {}) }
         }
         compose.onNodeWithText("Nema troškova").assertIsDisplayed()
 
@@ -83,5 +89,38 @@ class AddExpenseFlowTest {
         assertEquals(SplitType.HALF, saved.split)
         assertEquals(Person.LOVEL, saved.createdBy)
         assertEquals(LocalDate.now(), saved.date)
+    }
+
+    private fun chipLabels(): List<String> =
+        compose.onAllNodesWithTag(ExpenseFormTags.CATEGORY_CHIP).fetchSemanticsNodes().map { node ->
+            node.config[SemanticsProperties.Text].joinToString("") { it.text }
+        }
+
+    @Test
+    fun categoryChipsAreOrderedByUsage() {
+        val at = Instant.now()
+        fun used(category: String, times: Int) = List(times) {
+            Expense("$category-$it", LocalDate.now(), category, "", 100, Person.MARINA, SplitType.HALF, at, at, Person.MARINA)
+        }
+        expenses.records.value = (used("Putovanja", 3) + used("Režije", 2) + used("Prijenos", 5)).associateBy { it.id }
+        compose.setContent {
+            TroskoviTheme { AppShell(person = Person.LOVEL, onSignOut = {}) }
+        }
+        compose.onNodeWithText("Dodaj").performClick()
+
+        // Used categories first, then the static order; "Prijenos" is never offered for a new expense.
+        val labels = chipLabels()
+        assertEquals(listOf("Putovanja", "Režije", "Hrana", "Prijevoz", "Hrana van"), labels.take(5))
+        assertFalse("Prijenos" in labels)
+        assertEquals(Categories.FOR_PICKER.size, labels.size)
+    }
+
+    @Test
+    fun withoutExpensesTheChipsUseTheStaticOrder() {
+        compose.setContent {
+            TroskoviTheme { AppShell(person = Person.LOVEL, onSignOut = {}) }
+        }
+        compose.onNodeWithText("Dodaj").performClick()
+        assertEquals(Categories.FOR_PICKER, chipLabels())
     }
 }

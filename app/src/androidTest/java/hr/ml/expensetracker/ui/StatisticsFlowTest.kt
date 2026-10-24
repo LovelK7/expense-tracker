@@ -74,7 +74,7 @@ class StatisticsFlowTest {
     @Test
     fun switchPeriodsAndExpandACategory() {
         compose.setContent {
-            TroskoviTheme(dynamicColor = false) { AppShell(person = Person.LOVEL, onSignOut = {}) }
+            TroskoviTheme { AppShell(person = Person.LOVEL, onSignOut = {}) }
         }
         compose.onNodeWithText("Statistika").performClick()
 
@@ -117,7 +117,7 @@ class StatisticsFlowTest {
     fun emptyPeriod() {
         expenses.records.value = emptyMap()
         compose.setContent {
-            TroskoviTheme(dynamicColor = false) { AppShell(person = Person.LOVEL, onSignOut = {}) }
+            TroskoviTheme { AppShell(person = Person.LOVEL, onSignOut = {}) }
         }
         compose.onNodeWithText("Statistika").performClick()
         compose.onNodeWithText("Nema troškova u ovom razdoblju").assertIsDisplayed()

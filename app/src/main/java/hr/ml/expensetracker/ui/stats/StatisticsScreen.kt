@@ -54,9 +54,12 @@ import hr.ml.expensetracker.domain.Expense
 import hr.ml.expensetracker.domain.Money
 import hr.ml.expensetracker.domain.Person
 import hr.ml.expensetracker.domain.SplitType
+import hr.ml.expensetracker.ui.common.CategoryBadge
+import hr.ml.expensetracker.ui.common.CategoryVisuals
 import hr.ml.expensetracker.ui.common.label
 import hr.ml.expensetracker.ui.common.longDate
 import hr.ml.expensetracker.ui.common.paidByLabel
+import hr.ml.expensetracker.ui.theme.AppTheme
 import hr.ml.expensetracker.ui.theme.TroskoviTheme
 import java.text.NumberFormat
 import java.time.Instant
@@ -276,14 +279,15 @@ private fun SectionHeader(text: String) {
 private fun SummaryCard(state: StatsUiState, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
     ) {
         val onContainer = MaterialTheme.colorScheme.onPrimaryContainer
-        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.stats_total), style = MaterialTheme.typography.labelLarge, color = onContainer)
             Text(
                 text = Money.format(state.totalCents),
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.displaySmall,
                 color = onContainer,
                 modifier = Modifier.testTag(StatsTags.TOTAL),
             )
@@ -310,7 +314,7 @@ private fun SummaryLine(name: String, share: String, paid: String, header: Boole
 @Composable
 private fun CategoryItem(row: CategoryRow, totalCents: Long, onClick: () -> Unit) {
     val state = stringResource(if (row.expanded) R.string.stats_collapse else R.string.stats_expand)
-    Column(
+    Row(
         Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
@@ -318,15 +322,20 @@ private fun CategoryItem(row: CategoryRow, totalCents: Long, onClick: () -> Unit
             .semantics { stateDescription = state }
             .testTag(StatsTags.category(row.category))
             .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        BarContent(
-            title = row.category,
-            amount = Money.format(row.cents),
-            detail = if (totalCents > 0) percentText(row.percent) else null,
-            fraction = row.barFraction,
-            color = MaterialTheme.colorScheme.primary,
-            bold = row.expanded,
-        )
+        CategoryBadge(row.category, size = 36.dp)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            BarContent(
+                title = row.category,
+                amount = Money.format(row.cents),
+                detail = if (totalCents > 0) percentText(row.percent) else null,
+                fraction = row.barFraction,
+                color = CategoryVisuals.tint(row.category),
+                bold = row.expanded,
+            )
+        }
     }
 }
 
@@ -388,6 +397,7 @@ private fun Bar(fraction: Float, color: Color) {
 @Composable
 private fun ExpenseItem(expense: Expense) {
     ListItem(
+        leadingContent = { CategoryBadge(expense.category, size = 32.dp) },
         headlineContent = { Text(expense.category) },
         supportingContent = {
             Column {
@@ -402,8 +412,8 @@ private fun ExpenseItem(expense: Expense) {
             }
         },
         trailingContent = { Text(Money.format(expense.amountCents), style = MaterialTheme.typography.titleSmall) },
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        modifier = Modifier.padding(start = 16.dp).clip(MaterialTheme.shapes.small),
+        colors = ListItemDefaults.colors(containerColor = AppTheme.colors.card),
+        modifier = Modifier.padding(start = 16.dp).clip(MaterialTheme.shapes.medium),
     )
 }
 
@@ -412,7 +422,7 @@ private fun ExpenseItem(expense: Expense) {
 private fun StatisticsMonthPreview() {
     val at = Instant.parse("2026-10-24T08:00:00Z")
     val konzum = Expense("1", LocalDate.of(2026, 10, 20), "Hrana", "Konzum", 4_250, Person.LOVEL, SplitType.HALF, at, at, Person.LOVEL)
-    TroskoviTheme(dynamicColor = false) {
+    TroskoviTheme {
         StatisticsContent(
             state = StatsUiState(
                 loading = false,

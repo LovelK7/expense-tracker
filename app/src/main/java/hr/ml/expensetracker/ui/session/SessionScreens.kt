@@ -126,7 +126,7 @@ fun SessionErrorScreen(onRetry: () -> Unit, onSignOut: () -> Unit) {
 @Preview(showBackground = true)
 @Composable
 private fun SignInScreenPreview() {
-    TroskoviTheme(dynamicColor = false) {
+    TroskoviTheme {
         SignInScreen(signingIn = false, error = SignInError.NO_ACCOUNT, onSignIn = {})
     }
 }
@@ -134,7 +134,7 @@ private fun SignInScreenPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun NoAccessScreenPreview() {
-    TroskoviTheme(dynamicColor = false) {
+    TroskoviTheme {
         NoAccessScreen(email = "netko@example.com", onSignOut = {})
     }
 }

@@ -41,6 +41,20 @@ plus loans taken on their behalf) next to what they actually paid, totals per ca
 to list its expenses) and, for a year or all time, totals per month (all time: the last 24
 months). The numbers come from `Statistics` in `:domain`, computed off the main thread.
 
+### Design
+
+A fixed palette instead of Android's wallpaper colours (`ui/theme/Color.kt`, light and dark): warm
+off-white `#FAF7F2` / near-black `#17140F`, deep teal `#0F6B6B`, amber and muted rose accents.
+The balance card is teal when you are owed money, rose when you owe, neutral when settled.
+Type is [Outfit](https://fonts.google.com/specimen/Outfit) for headlines and amounts and
+[Inter](https://fonts.google.com/specimen/Inter) for text, both with tabular figures. The TTFs in
+`app/src/main/res/font/` are static instances (Outfit 500/600, Inter 400/500 at opsz 14) of the
+variable fonts in the [google/fonts](https://github.com/google/fonts) repo, made with fontTools'
+`varLib.instancer`; SIL Open Font License, texts in `app/src/main/assets/licenses/`. Category icons
+are Material Symbols Rounded (Apache 2.0) vector drawables `res/drawable/ic_cat_*.xml`; icon and
+colour per category are set in `ui/common/CategoryVisuals.kt` (unknown categories get a generic
+icon). The add form lists the categories you use most first.
+
 ## Firebase
 
 Project `troskovi-ml` (see `.firebaserc`), Android app `hr.ml.expensetracker`.

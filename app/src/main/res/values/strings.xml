@@ -24,6 +24,9 @@
     <string name="balance_lovel_owes">Lovel duguje Marini %1$s</string>
     <string name="balance_marina_owes">Marina duguje Lovelu %1$s</string>
     <string name="balance_settled">Sve je podmireno</string>
+    <!-- The balance card shows the direction above the big amount. -->
+    <string name="balance_lovel_owes_short">Lovel duguje Marini</string>
+    <string name="balance_marina_owes_short">Marina duguje Lovelu</string>
     <string name="home_empty">Nema troškova</string>
     <string name="home_load_error">Podaci se trenutno ne mogu učitati.</string>
 

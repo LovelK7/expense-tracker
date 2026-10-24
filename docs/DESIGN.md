@@ -22,6 +22,7 @@ multi-currency, no friends list. Shared expenses only; private spending is out o
 | Settlements | New explicit record type from day one (`Settlement`), used instead of ad hoc "Prijenos" rows going forward. |
 | Repo | Public GitHub repo. Secrets and private data gitignored (`private/`, `google-services.json`, `local.properties`, `*.jks`, `*.keystore`). Example files committed instead. |
 | Distribution | Signed APK attached to GitHub Releases, sideloaded. No Play Store for the MVP. |
+| Visual style (Stage 6) | Own palette, no wallpaper-based dynamic colour: warm off-white / warm near-black, deep teal primary, amber secondary, muted rose tertiary. Outfit (headlines, amounts) and Inter (body), bundled, tabular figures. One icon and colour per category (`ui/common/CategoryVisuals`). The balance card is teal when the signed-in person is owed, rose when they owe, neutral when settled. |
 
 ## Domain model
 
@@ -45,9 +46,14 @@ Settlement(id, date: LocalDate, from: Person, to: Person, amountCents: Long, not
 Categories are a controlled list (seeded from the sheet's "Kategorije" tab plus every category
 actually used in the "POPIS" tab). Normalisation: trim, case-insensitive match ("hrana" → "Hrana");
 the legacy list entry "Odjeća" maps to the used name "Odjeća i oprema".
-The add form (Stage 3) lists the most used legacy categories first (Hrana, Prijevoz, Hrana van,
-Režije, Potrepštine, Putovanja, MPO, Adaptacija) and omits "Prijenos" for new expenses (transfers
-are settlements now); editing a legacy "Prijenos" row still shows it.
+The add form orders the category chips by real usage (Stage 6, `Categories.orderByUsage`): the
+number of non-deleted expenses per category, all time, most used first, recomputed live from the
+repository. Ties (and categories nobody has used) keep the static order `Categories.FOR_PICKER`
+(the most used legacy categories at import time: Hrana, Prijevoz, Hrana van, Režije, Potrepštine,
+Putovanja, MPO, Adaptacija; then the rest alphabetically), which is also the order before any data
+has loaded. With the legacy history the first chips are Hrana, Prijevoz, Putovanja, Režije, Hrana
+van. "Prijenos" is omitted for new expenses (transfers are settlements now); editing a legacy
+"Prijenos" row still shows it, first.
 
 ## Balance rules (the "brain")
 

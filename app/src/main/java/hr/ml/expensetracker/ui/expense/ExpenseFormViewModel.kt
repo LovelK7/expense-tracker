@@ -15,7 +15,10 @@ import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -30,6 +33,7 @@ data class ExpenseFormState(
     val split: SplitType = SplitType.HALF,
     val date: LocalDate,
     val today: LocalDate,
+    /** Picker order: most used first ([Categories.orderByUsage]). */
     val categories: List<String> = Categories.FOR_PICKER,
     /** Id of the expense being edited; null for a new one. */
     val editingId: String? = null,
@@ -46,7 +50,8 @@ data class ExpenseFormState(
 /**
  * The "Dodaj trošak" form, also used to edit an existing expense ([startEdit]). Saving creates
  * the expense with `createdBy` = the signed-in person, or updates it keeping its id, `createdBy`
- * and `createdAt`.
+ * and `createdAt`. The category chips are ordered by how often each category has been used,
+ * live from [expenses] (the static [Categories.FOR_PICKER] until the expenses are loaded).
  */
 class ExpenseFormViewModel(
     private val expenses: ExpenseRepository,
@@ -54,11 +59,32 @@ class ExpenseFormViewModel(
     private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
     private var editing: Expense? = null
+
+    /** The new-expense picker order by usage; declared before [_state], which [blank] initialises. */
+    private var pickerOrder: List<String> = Categories.FOR_PICKER
     private val _state = MutableStateFlow(blank())
     val state: StateFlow<ExpenseFormState> = _state.asStateFlow()
 
+    init {
+        viewModelScope.launch {
+            expenses.observeAll()
+                .map { Categories.orderByUsage(it) }
+                .distinctUntilChanged()
+                // Without the expenses the static order stays; the screens report load errors.
+                .catch { }
+                .collect { order ->
+                    pickerOrder = order
+                    _state.update { it.copy(categories = pickerFor(editing?.category)) }
+                }
+        }
+    }
+
     private fun blank(today: LocalDate = LocalDate.now(clock)) =
-        ExpenseFormState(paidBy = currentPerson.get() ?: Person.LOVEL, date = today, today = today)
+        ExpenseFormState(paidBy = currentPerson.get() ?: Person.LOVEL, date = today, today = today, categories = pickerOrder)
+
+    /** The picker for an expense in [category]: a legacy category outside it (e.g. "Prijenos") stays selectable. */
+    private fun pickerFor(category: String?): List<String> =
+        if (category == null || category in pickerOrder) pickerOrder else listOf(category) + pickerOrder
 
     /** Loads the expense [id] into the form; a no-op when it is already loaded (e.g. after rotation). */
     fun startEdit(id: String) {
@@ -81,12 +107,7 @@ class ExpenseFormViewModel(
                     paidBy = expense.paidBy,
                     split = expense.split,
                     date = expense.date,
-                    // A legacy category outside the picker list (e.g. "Prijenos") stays selectable.
-                    categories = if (expense.category in Categories.FOR_PICKER) {
-                        Categories.FOR_PICKER
-                    } else {
-                        listOf(expense.category) + Categories.FOR_PICKER
-                    },
+                    categories = pickerFor(expense.category),
                     loaded = true,
                 )
             }

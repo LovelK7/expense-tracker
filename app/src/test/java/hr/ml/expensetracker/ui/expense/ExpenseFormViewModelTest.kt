@@ -2,6 +2,7 @@ package hr.ml.expensetracker.ui.expense
 
 import hr.ml.expensetracker.domain.Categories
 import hr.ml.expensetracker.domain.Expense
+import hr.ml.expensetracker.domain.ExpenseRepository
 import hr.ml.expensetracker.domain.Person
 import hr.ml.expensetracker.domain.SplitType
 import hr.ml.expensetracker.session.CurrentPerson
@@ -12,6 +13,8 @@ import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -176,6 +179,65 @@ class ExpenseFormViewModelTest {
         vm.startEdit("old")
         assertEquals("Prijenos", vm.state.value.categories.first())
         assertEquals("Prijenos", vm.state.value.category)
+    }
+
+    private fun addUses(category: String, times: Int, deleted: Boolean = false) = repeat(times) {
+        val at = Instant.parse("2025-01-01T00:00:00Z")
+        repo.add(Expense(repo.newId(), LocalDate.of(2025, 1, 1), category, "", 100, Person.LOVEL, SplitType.HALF, at, at, Person.LOVEL, deleted))
+    }
+
+    @Test
+    fun usageCountsOrderTheCategories() {
+        addUses("Zabava", 3)
+        addUses("Poklon", 2)
+        addUses("Hrana", 5, deleted = true) // deleted rows do not count
+        addUses("Prijenos", 9) // legacy transfers never become a new-expense chip
+        val s = viewModel().state.value
+        assertEquals(listOf("Zabava", "Poklon") + (Categories.FOR_PICKER - setOf("Zabava", "Poklon")), s.categories)
+    }
+
+    @Test
+    fun withoutExpensesTheStaticOrderIsUsed() {
+        assertEquals(Categories.FOR_PICKER, viewModel().state.value.categories)
+    }
+
+    @Test
+    fun whenExpensesCannotBeLoadedTheStaticOrderIsUsed() {
+        val failing = object : ExpenseRepository by repo {
+            override fun observeAll(): Flow<List<Expense>> = flow { throw IllegalStateException("offline") }
+        }
+        val vm = ExpenseFormViewModel(failing, CurrentPerson { Person.LOVEL }, clock)
+        assertEquals(Categories.FOR_PICKER, vm.state.value.categories)
+    }
+
+    @Test
+    fun theOrderFollowsNewExpensesAndAPristineFormStaysPristine() {
+        val vm = viewModel()
+        addUses("Usluge", 1)
+        assertEquals("Usluge", vm.state.value.categories.first())
+
+        // A form showing the newer order is still untouched: resetIfPristine keeps it as is.
+        vm.resetIfPristine()
+        assertEquals("Usluge", vm.state.value.categories.first())
+
+        // Saving counts too: two "Zdravlje" make it the first chip of the next blank form.
+        repeat(2) {
+            vm.onAmountChange("5")
+            vm.onCategorySelect("Zdravlje")
+            assertTrue(vm.save())
+        }
+        assertEquals(listOf("Zdravlje", "Usluge"), vm.state.value.categories.take(2))
+        assertNull(vm.state.value.category)
+    }
+
+    @Test
+    fun editingUsesTheUsageOrderToo() {
+        addUses("Ostalo", 2)
+        val at = Instant.parse("2025-01-01T00:00:00Z")
+        repo.add(Expense("old", LocalDate.of(2025, 1, 1), "Prijenos", "", 100, Person.LOVEL, SplitType.FULL_FOR_OTHER, at, at, Person.LOVEL))
+        val vm = viewModel()
+        vm.startEdit("old")
+        assertEquals(listOf("Prijenos", "Ostalo"), vm.state.value.categories.take(2))
     }
 
     @Test
