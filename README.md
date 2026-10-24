@@ -31,6 +31,16 @@ CI runs the same command on every push and pull request to `main` (with
 | `tools` | Python admin scripts: legacy import, Firestore member allow-list, rules deployment. |
 | `firebase/rules-tests` | Firestore security rules tests (Node, Firestore emulator). |
 
+### Statistika
+
+The "Statistika" tab mirrors the legacy PIVOT sheet. Pick **Mjesec**, **Godina** or **Sve** and
+step through months or years with the arrows (from the earliest to the latest expense; the
+current month is the default). Periods are by the expense date; deleted expenses and settlements
+are not counted. It shows the period total, each person's share (half of every shared expense
+plus loans taken on their behalf) next to what they actually paid, totals per category (tap one
+to list its expenses) and, for a year or all time, totals per month (all time: the last 24
+months). The numbers come from `Statistics` in `:domain`, computed off the main thread.
+
 ## Firebase
 
 Project `troskovi-ml` (see `.firebaserc`), Android app `hr.ml.expensetracker`.

@@ -23,7 +23,22 @@ data class Statistics(
     val shareByPerson: Map<Person, Long>,
     /** How much each person actually paid. */
     val paidByPerson: Map<Person, Long>,
+    /** Number of (non-deleted) expenses in the range. */
+    val expenseCount: Int = 0,
 ) {
+    /**
+     * [byMonth] with the gaps filled: every calendar month from the first to the last month that
+     * has expenses, chronological, zero for months without any. Empty when there are no expenses.
+     */
+    fun byMonthContinuous(): Map<YearMonth, Long> {
+        if (byMonth.isEmpty()) return emptyMap()
+        val first = byMonth.keys.first()
+        val last = byMonth.keys.last()
+        return generateSequence(first) { it.plusMonths(1) }
+            .takeWhile { !it.isAfter(last) }
+            .associateWith { byMonth[it] ?: 0L }
+    }
+
     companion object {
         fun compute(expenses: Iterable<Expense>, from: LocalDate, to: LocalDate): Statistics {
             require(!to.isBefore(from)) { "Empty range: $from..$to" }
@@ -56,6 +71,7 @@ data class Statistics(
                 paidByPerson = Person.entries.associateWith { p ->
                     inRange.filter { it.paidBy == p }.sumOf { it.amountCents }
                 },
+                expenseCount = inRange.size,
             )
         }
 
@@ -64,5 +80,20 @@ data class Statistics(
 
         fun forYear(expenses: Iterable<Expense>, year: Int): Statistics =
             compute(expenses, LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31))
+
+        /**
+         * Everything: the range runs from the earliest to the latest non-deleted expense.
+         * Null when there is no such expense (there is no range to report on).
+         */
+        fun forAll(expenses: Iterable<Expense>): Statistics? {
+            var from: LocalDate? = null
+            var to: LocalDate? = null
+            for (e in expenses) {
+                if (e.deleted) continue
+                if (from == null || e.date.isBefore(from)) from = e.date
+                if (to == null || e.date.isAfter(to)) to = e.date
+            }
+            return if (from == null || to == null) null else compute(expenses, from, to)
+        }
     }
 }

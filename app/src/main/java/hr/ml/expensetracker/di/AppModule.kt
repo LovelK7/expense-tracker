@@ -20,6 +20,7 @@ import hr.ml.expensetracker.session.SessionRepository
 import hr.ml.expensetracker.ui.expense.ExpenseFormViewModel
 import hr.ml.expensetracker.ui.home.HomeViewModel
 import hr.ml.expensetracker.ui.session.SessionViewModel
+import hr.ml.expensetracker.ui.stats.StatisticsViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -62,4 +63,5 @@ val appModule = module {
     viewModel { SessionViewModel(get(), get()) }
     viewModel { HomeViewModel(get(), get(), get()) }
     viewModel { ExpenseFormViewModel(get(), get()) }
+    viewModel { StatisticsViewModel(get()) }
 }

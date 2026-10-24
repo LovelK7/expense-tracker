@@ -76,4 +76,52 @@ class StatisticsTest {
     fun `reversed range is rejected`() {
         assertThrows<IllegalArgumentException> { Statistics.compute(expenses, d(2, 1), d(1, 1)) }
     }
+    @Test
+    fun `expense count excludes deleted rows and rows outside the range`() {
+        assertEquals(2, Statistics.forMonth(expenses, YearMonth.of(2026, 2)).expenseCount)
+        assertEquals(5, Statistics.forYear(expenses, 2026).expenseCount)
+        assertEquals(0, Statistics.forYear(expenses, 2020).expenseCount)
+    }
+
+    @Test
+    fun `continuous months fill gaps with zero`() {
+        val gappy = listOf(
+            expense(100, LOVEL, HALF, d(11, 5, 2025)),
+            expense(300, MARINA, HALF, d(2, 14)),
+            expense(50, MARINA, HALF, d(2, 15)),
+        )
+        val s = Statistics.compute(gappy, d(1, 1, 2025), d(12, 31))
+        assertEquals(
+            listOf(
+                YearMonth.of(2025, 11) to 100L,
+                YearMonth.of(2025, 12) to 0L,
+                YearMonth.of(2026, 1) to 0L,
+                YearMonth.of(2026, 2) to 350L,
+            ),
+            s.byMonthContinuous().toList(),
+        )
+        assertEquals(mapOf(YearMonth.of(2025, 11) to 100L, YearMonth.of(2026, 2) to 350L), s.byMonth)
+    }
+
+    @Test
+    fun `continuous months are empty without expenses`() {
+        assertEquals(emptyMap(), Statistics.forYear(expenses, 2020).byMonthContinuous())
+    }
+
+    @Test
+    fun `all time spans the earliest to the latest live expense`() {
+        val withLateDeleted = expenses + expense(5, LOVEL, HALF, d(6, 1, 2027), deleted = true)
+        val s = Statistics.forAll(withLateDeleted)!!
+        assertEquals(d(12, 31, 2025), s.from)
+        assertEquals(d(3, 1), s.to) // the deleted 2027 row does not stretch the range
+        assertEquals(7201L + 4000, s.totalCents)
+        assertEquals(6, s.expenseCount)
+        assertEquals(s.totalCents, s.shareByPerson.values.sum())
+    }
+
+    @Test
+    fun `all time is null without live expenses`() {
+        assertEquals(null, Statistics.forAll(emptyList()))
+        assertEquals(null, Statistics.forAll(listOf(expense(100, LOVEL, deleted = true))))
+    }
 }

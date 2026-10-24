@@ -23,7 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -33,6 +32,7 @@ import hr.ml.expensetracker.ui.common.label
 import hr.ml.expensetracker.ui.expense.AddExpenseScreen
 import hr.ml.expensetracker.ui.expense.EditExpenseScreen
 import hr.ml.expensetracker.ui.home.HomeScreen
+import hr.ml.expensetracker.ui.stats.StatisticsScreen
 import kotlinx.coroutines.launch
 
 private enum class Destination(@param:StringRes val label: Int, @param:DrawableRes val icon: Int) {
@@ -92,9 +92,7 @@ fun AppShell(person: Person, onSignOut: () -> Unit) {
                     modifier = modifier,
                 )
                 Destination.ADD -> AddExpenseScreen(onSaved = onSaved, modifier = modifier)
-                Destination.STATS -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.stats_placeholder))
-                }
+                Destination.STATS -> StatisticsScreen(modifier = modifier)
             }
         }
         editingId?.let { id ->

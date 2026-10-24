@@ -88,5 +88,39 @@
     <string name="note_label">Napomena (neobavezno)</string>
     <string name="settlement_saved">Podmirenje spremljeno</string>
 
-    <string name="stats_placeholder">Statistika stiže uskoro.</string>
+    <!-- Statistika -->
+    <string name="stats_mode_month">Mjesec</string>
+    <string name="stats_mode_year">Godina</string>
+    <string name="stats_mode_all">Sve</string>
+    <string name="stats_previous">Prethodno razdoblje</string>
+    <string name="stats_next">Sljedeće razdoblje</string>
+    <!-- "listopad 2026.", "2026.", "siječanj 2023. – listopad 2026." -->
+    <string name="month_year">%1$s %2$d.</string>
+    <string name="year_label">%1$d.</string>
+    <string name="stats_range">%1$s – %2$s</string>
+    <string-array name="months_nominative">
+        <item>siječanj</item>
+        <item>veljača</item>
+        <item>ožujak</item>
+        <item>travanj</item>
+        <item>svibanj</item>
+        <item>lipanj</item>
+        <item>srpanj</item>
+        <item>kolovoz</item>
+        <item>rujan</item>
+        <item>listopad</item>
+        <item>studeni</item>
+        <item>prosinac</item>
+    </string-array>
+    <string name="stats_total">Ukupno</string>
+    <string name="stats_share">Udio</string>
+    <string name="stats_paid">Plaćeno</string>
+    <string name="stats_by_category">Po kategorijama</string>
+    <string name="stats_by_month">Po mjesecima</string>
+    <string name="stats_share_by_person">Udio po osobi</string>
+    <string name="stats_older_hidden">Starije nije prikazano</string>
+    <string name="stats_empty">Nema troškova u ovom razdoblju</string>
+    <string name="stats_percent">%1$s %%</string>
+    <string name="stats_expand">Prikaži troškove</string>
+    <string name="stats_collapse">Sakrij troškove</string>
 </resources>
