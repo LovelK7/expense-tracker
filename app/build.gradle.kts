@@ -62,8 +62,8 @@ val releaseSigning: ReleaseSigning? = run {
     }
     ReleaseSigning(
         storeFile,
-        env.getValue("TROSKOVI_KEYSTORE_PASSWORD")!!,
-        env.getValue("TROSKOVI_KEY_PASSWORD")!!,
+        env.getValue("TROSKOVI_KEYSTORE_PASSWORD")!!.trim(),
+        env.getValue("TROSKOVI_KEY_PASSWORD")!!.trim(),
         env.getValue("TROSKOVI_KEY_ALIAS")!!.trim(),
     )
 }
