@@ -6,7 +6,16 @@
     <string name="nav_add">Dodaj</string>
     <string name="nav_stats">Statistika</string>
 
-    <string name="home_placeholder">Stanje i nedavni troškovi stižu uskoro.</string>
+    <string name="balance_title">Stanje</string>
+    <string name="balance_lovel_owes">Lovel duguje Marini %1$s</string>
+    <string name="balance_marina_owes">Marina duguje Lovelu %1$s</string>
+    <string name="balance_settled">Sve je podmireno</string>
+    <plurals name="balance_sample_note">
+        <item quantity="one">Primjer: %1$d trošak (stvarni podaci stižu uskoro)</item>
+        <item quantity="few">Primjer: %1$d troška (stvarni podaci stižu uskoro)</item>
+        <item quantity="other">Primjer: %1$d troškova (stvarni podaci stižu uskoro)</item>
+    </plurals>
+
     <string name="add_placeholder">Unos troška stiže uskoro.</string>
     <string name="stats_placeholder">Statistika stiže uskoro.</string>
 </resources>

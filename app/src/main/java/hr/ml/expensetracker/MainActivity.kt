@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import hr.ml.expensetracker.ui.home.HomeScreen
 import hr.ml.expensetracker.ui.theme.TroskoviTheme
 
 class MainActivity : ComponentActivity() {
@@ -62,7 +63,7 @@ private fun AppShell() {
     ) { padding ->
         val modifier = Modifier.padding(padding)
         when (current) {
-            Destination.HOME -> Placeholder(R.string.home_placeholder, modifier)
+            Destination.HOME -> HomeScreen(modifier)
             Destination.ADD -> Placeholder(R.string.add_placeholder, modifier)
             Destination.STATS -> Placeholder(R.string.stats_placeholder, modifier)
         }

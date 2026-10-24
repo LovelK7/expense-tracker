@@ -24,12 +24,20 @@ Start-Process "$sdk\emulator\emulator.exe" -ArgumentList '-avd','Pixel_9_new','-
 & "$sdk\platform-tools\adb.exe" shell am start -n hr.ml.expensetracker/.MainActivity
 ```
 
+Legacy import (needs `private/Financije_ML_2023.xlsx`):
+
+```powershell
+python -m pip install --user -r tools\requirements.txt
+python tools\export_legacy.py    # -> private\legacy_popis.csv, private\legacy_categories.txt
+```
+
 ## Layout
 
-- `:domain` – pure Kotlin/JVM, no Android deps: models, balance engine, statistics (Stage 1).
+- `:domain` – pure Kotlin/JVM, no Android deps. `Expense`, `Settlement`, `Person`, `SplitType`,
+  `BalanceCalculator`, `Statistics`, `CategoryNormalizer`, `Money`, `LegacyCsvParser`.
 - `:app` – Compose + Material 3 UI, ViewModels exposing `StateFlow`, Koin DI (`di/AppModule.kt`).
   Package `hr.ml.expensetracker`.
-- `tools/` – Python admin scripts (Stage 1). Their output goes to `private/`, never into git.
+- `tools/` – Python admin scripts. Their output goes to `private/`, never into git.
 - Versions: `gradle/libs.versions.toml`. compileSdk is locked at 36, which pins some AndroidX
   libraries one release behind (see the comment there).
 
