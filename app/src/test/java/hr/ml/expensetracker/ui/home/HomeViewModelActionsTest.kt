@@ -45,7 +45,7 @@ class HomeViewModelActionsTest {
     ) = Expense(id, date, "Hrana", "", cents, paidBy, split, createdAt, createdAt, paidBy)
 
     private fun TestScope.viewModel(person: Person = Person.LOVEL): HomeViewModel {
-        val vm = HomeViewModel(expenses, settlements, CurrentPerson { person }, clock)
+        val vm = HomeViewModel(expenses, settlements, CurrentPerson { person }, clock, UnconfinedTestDispatcher(testScheduler))
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect {} }
         return vm
     }

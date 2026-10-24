@@ -68,7 +68,7 @@ class HomeViewModelTest {
     fun balanceFollowsTheRepositories() = runTest {
         val expenses = MutableStateFlow(emptyList<Expense>())
         val settlements = MutableStateFlow(emptyList<Settlement>())
-        val vm = HomeViewModel(FakeExpenses(expenses), FakeSettlements(settlements))
+        val vm = HomeViewModel(FakeExpenses(expenses), FakeSettlements(settlements), computeDispatcher = UnconfinedTestDispatcher(testScheduler))
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect {} }
 
         assertFalse(vm.state.value.loading)
@@ -94,7 +94,7 @@ class HomeViewModelTest {
 
     @Test
     fun startsLoadingUntilTheFirstSnapshot() = runTest {
-        val vm = HomeViewModel(FakeExpenses(flow { }), FakeSettlements(MutableStateFlow(emptyList())))
+        val vm = HomeViewModel(FakeExpenses(flow { }), FakeSettlements(MutableStateFlow(emptyList())), computeDispatcher = UnconfinedTestDispatcher(testScheduler))
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect {} }
         assertTrue(vm.state.value.loading)
     }
@@ -102,7 +102,7 @@ class HomeViewModelTest {
     @Test
     fun repositoryFailureShowsAnError() = runTest {
         val failing = flow<List<Expense>> { throw IllegalStateException("permission denied") }
-        val vm = HomeViewModel(FakeExpenses(failing), FakeSettlements(MutableStateFlow(emptyList())))
+        val vm = HomeViewModel(FakeExpenses(failing), FakeSettlements(MutableStateFlow(emptyList())), computeDispatcher = UnconfinedTestDispatcher(testScheduler))
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect {} }
         assertTrue(vm.state.value.error)
         assertFalse(vm.state.value.loading)

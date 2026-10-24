@@ -87,6 +87,13 @@ for a selected month or year, excluding deleted rows. Mirrors the legacy "PIVOT"
    common grocery entry.
 2. **Početna** (home): balance card ("Marina duguje Lovelu 534,70 €"), "Podmiri" (settle up)
    button, recent expenses list with edit and soft delete.
+   - Month filter and search (Stage 7): chips above the list ("Sve", then every month with a
+     record, newest first) and a search field behind the top-bar search icon (category and
+     description, case- and diacritics-insensitive, every word must match; `RecordFilter` in
+     `:domain`). They combine; while one is active a line shows the shown expenses' count and sum
+     ("23 troška · 312,40 €", settlements listed but not summed) or "Nema rezultata". The balance
+     card always stays global. The selection lives in the ViewModel (survives tab switches and
+     rotation, not a restart).
 3. **Statistika** (stats): month/year picker, per-category totals, monthly trend, per-person half.
 
 Deferred (v2 backlog): recurring rent template, home-screen quick-add widget, receipt photos,

@@ -31,6 +31,15 @@ CI runs the same command on every push and pull request to `main` (with
 | `tools` | Python admin scripts: legacy import, Firestore member allow-list, rules deployment. |
 | `firebase/rules-tests` | Firestore security rules tests (Node, Firestore emulator). |
 
+### Početna
+
+The home tab shows the balance (always over everything), "Podmiri" and every record grouped by
+day. The chips above the list narrow it to one month ("Sve" shows all); the search icon in the
+top bar searches category and description, ignoring case and diacritics ("rezije" finds
+"Režije"; several words must all match). Both combine, and a line above the list then sums the
+shown expenses ("23 troška · 312,40 €"). Edit, delete with undo and settle up work as usual on a
+filtered list.
+
 ### Statistika
 
 The "Statistika" tab mirrors the legacy PIVOT sheet. Pick **Mjesec**, **Godina** or **Sve** and

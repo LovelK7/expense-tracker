@@ -1,5 +1,6 @@
 package hr.ml.expensetracker.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
@@ -27,17 +28,23 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import hr.ml.expensetracker.R
 import hr.ml.expensetracker.domain.Person
 import hr.ml.expensetracker.ui.common.label
 import hr.ml.expensetracker.ui.expense.AddExpenseScreen
 import hr.ml.expensetracker.ui.expense.EditExpenseScreen
 import hr.ml.expensetracker.ui.home.HomeScreen
+import hr.ml.expensetracker.ui.home.HomeSearchField
+import hr.ml.expensetracker.ui.home.HomeTags
+import hr.ml.expensetracker.ui.home.HomeViewModel
 import hr.ml.expensetracker.ui.stats.StatisticsScreen
 import kotlinx.coroutines.launch
+import org.koin.androidx.compose.koinViewModel
 
 private enum class Destination(@param:StringRes val label: Int, @param:DrawableRes val icon: Int) {
     HOME(R.string.nav_home, R.drawable.ic_home),
@@ -60,25 +67,38 @@ fun AppShell(person: Person, onSignOut: () -> Unit) {
         scope.launch { snackbar.showSnackbar(savedMessage) }
     }
 
+    // The same instance HomeScreen gets: the top bar hosts its search field.
+    val home: HomeViewModel = koinViewModel()
+    val searchOpen by home.searchOpen.collectAsStateWithLifecycle()
+    val searching = searchOpen && current == Destination.HOME
+    BackHandler(enabled = searching && editingId == null, onBack = home::closeSearch)
+
     Box(Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.app_name)) },
-                    actions = {
-                        Text(
-                            text = stringResource(person.label),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape)
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                        )
-                        IconButton(onClick = onSignOut) {
-                            Icon(painterResource(R.drawable.ic_logout), contentDescription = stringResource(R.string.sign_out))
-                        }
-                    },
-                )
+                if (searching) {
+                    TopAppBar(
+                        navigationIcon = {
+                            IconButton(onClick = home::closeSearch, modifier = Modifier.testTag(HomeTags.SEARCH_CLOSE)) {
+                                Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.search_close))
+                            }
+                        },
+                        title = {
+                            HomeSearchField(
+                                text = home.searchText,
+                                onTextChange = home::onSearchTextChange,
+                                onClear = home::clearSearch,
+                            )
+                        },
+                    )
+                } else {
+                    MainTopBar(
+                        person = person,
+                        showSearch = current == Destination.HOME,
+                        onSearch = home::openSearch,
+                        onSignOut = onSignOut,
+                    )
+                }
             },
             bottomBar = {
                 NavigationBar {
@@ -102,6 +122,7 @@ fun AppShell(person: Person, onSignOut: () -> Unit) {
                     scope = scope,
                     onEditExpense = { editingId = it },
                     modifier = modifier,
+                    viewModel = home,
                 )
                 Destination.ADD -> AddExpenseScreen(onSaved = onSaved, modifier = modifier)
                 Destination.STATS -> StatisticsScreen(modifier = modifier)
@@ -111,4 +132,31 @@ fun AppShell(person: Person, onSignOut: () -> Unit) {
             EditExpenseScreen(expenseId = id, onClose = { editingId = null }, onSaved = onSaved)
         }
     }
+}
+
+/** App name, the search button (on "Početna"), the signed-in person and sign-out. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MainTopBar(person: Person, showSearch: Boolean, onSearch: () -> Unit, onSignOut: () -> Unit) {
+    TopAppBar(
+        title = { Text(stringResource(R.string.app_name)) },
+        actions = {
+            if (showSearch) {
+                IconButton(onClick = onSearch, modifier = Modifier.testTag(HomeTags.SEARCH_OPEN)) {
+                    Icon(painterResource(R.drawable.ic_search), contentDescription = stringResource(R.string.search))
+                }
+            }
+            Text(
+                text = stringResource(person.label),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+            IconButton(onClick = onSignOut) {
+                Icon(painterResource(R.drawable.ic_logout), contentDescription = stringResource(R.string.sign_out))
+            }
+        },
+    )
 }

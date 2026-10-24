@@ -38,7 +38,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
@@ -58,6 +57,7 @@ import hr.ml.expensetracker.ui.common.CategoryBadge
 import hr.ml.expensetracker.ui.common.CategoryVisuals
 import hr.ml.expensetracker.ui.common.label
 import hr.ml.expensetracker.ui.common.longDate
+import hr.ml.expensetracker.ui.common.monthLabel
 import hr.ml.expensetracker.ui.common.paidByLabel
 import hr.ml.expensetracker.ui.theme.AppTheme
 import hr.ml.expensetracker.ui.theme.TroskoviTheme
@@ -242,13 +242,6 @@ private val StatsMode.label: Int
         StatsMode.YEAR -> R.string.stats_mode_year
         StatsMode.ALL -> R.string.stats_mode_all
     }
-
-/** "listopad 2026." (the nominative month name, as on the legacy sheet). */
-@Composable
-private fun monthLabel(month: YearMonth): String {
-    val names = stringArrayResource(R.array.months_nominative)
-    return stringResource(R.string.month_year, names[month.monthValue - 1], month.year)
-}
 
 private val PERCENT_FORMAT: NumberFormat = NumberFormat.getNumberInstance(Locale.forLanguageTag("hr")).apply {
     minimumFractionDigits = 1

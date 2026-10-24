@@ -84,6 +84,20 @@
     <string name="settlement_deleted">Podmirenje obrisano</string>
     <string name="undo">Poništi</string>
 
+    <!-- Home filter and search. The plural forms are picked by CroatianPlural (not <plurals>, which
+         follow the device language): "1 trošak", "2 troška", "5 troškova". -->
+    <string name="filter_all">Sve</string>
+    <string name="expense_count_one">%1$d trošak</string>
+    <string name="expense_count_few">%1$d troška</string>
+    <string name="expense_count_many">%1$d troškova</string>
+    <!-- "23 troška · 312,40 €" -->
+    <string name="filter_summary">%1$s · %2$s</string>
+    <string name="filter_no_results">Nema rezultata</string>
+    <string name="search">Pretraži</string>
+    <string name="search_placeholder">Pretraži…</string>
+    <string name="search_clear">Obriši pretragu</string>
+    <string name="search_close">Zatvori pretragu</string>
+
     <!-- Settle up -->
     <string name="settle_up">Podmiri</string>
     <string name="settle_lovel_pays">Lovel plaća Marini</string>
