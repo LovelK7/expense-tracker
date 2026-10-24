@@ -21,6 +21,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import hr.ml.expensetracker.BuildConfig
 import hr.ml.expensetracker.R
 import hr.ml.expensetracker.dev.DevAccount
 import hr.ml.expensetracker.ui.theme.TroskoviTheme
@@ -85,6 +86,7 @@ fun SignInScreen(
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
+        Text("v${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

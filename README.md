@@ -49,8 +49,9 @@ One-time console setup:
 
 1. Authentication > Sign-in method: enable **Google**.
 2. Project settings > Your apps > Android app: add the **SHA-1** of every key that signs an APK you
-   install (the debug keystore on each dev machine, later the release key). Get it with
-   `keytool -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey`.
+   install (the debug keystore on each dev machine and the release key, see "Releases"). Get it with
+   `keytool -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey`
+   (release key: `keytool -list -v -keystore private/release.jks -alias troskovi`).
    Then download `google-services.json` again into `app/`.
 3. Firestore Database: create the `(default)` database.
 4. Project settings > Service accounts > Generate new private key, saved as
@@ -176,6 +177,68 @@ npm run test:emulator
 
 CI runs them in the `firebase-rules` job.
 
+## Releases
+
+Release APKs are signed with the release key and attached to a GitHub Release; they are installed
+by sideloading (no Play Store). The release build type is not minified yet (`isMinifyEnabled` and
+`isShrinkResources` are off): enabling R8 is a later step, it needs keep rules for Firebase and
+Koin first.
+
+### Signing
+
+`app/build.gradle.kts` takes the release signing config from, in this order:
+
+1. `private/keystore.properties` (gitignored; copy [`keystore.properties.example`](keystore.properties.example)).
+   `storeFile` is relative to `app/`, so `../private/release.jks` is `private/release.jks`.
+2. The environment variables `TROSKOVI_KEYSTORE_BASE64` (the keystore file, base64; decoded to the
+   temp directory at configuration time), `TROSKOVI_KEYSTORE_PASSWORD`, `TROSKOVI_KEY_PASSWORD`
+   and `TROSKOVI_KEY_ALIAS`. Setting only some of them fails the build.
+3. Neither: `assembleRelease` still works but prints a warning and produces an unsigned
+   `app-release-unsigned.apk`. The regular CI workflow never builds the release variant.
+
+The key is `private/release.jks` (alias `troskovi`, RSA 2048). Keep a backup of it and its
+passwords outside the repo: an installed app only accepts updates signed with the same key. Its
+SHA-1 must be registered in Firebase (see "Firebase", step 2), or Google sign-in fails in release
+builds. Release and debug builds are signed with different keys, so switching an installed app
+between them needs an uninstall (`adb uninstall hr.ml.expensetracker`, which deletes the app's
+local data).
+
+The version comes from Gradle properties: `appVersionName` (default `0.1.0-dev`) and
+`appVersionCode` (default `1`). A local signed build (PowerShell needs the quotes):
+
+```powershell
+.\gradlew.bat :app:assembleRelease "-PappVersionName=0.1.0-local" "-PappVersionCode=10000"
+# -> app\build\outputs\apk\release\app-release.apk
+& "$env:LOCALAPPDATA\Android\Sdk\build-tools\37.0.0\apksigner.bat" verify --print-certs app\build\outputs\apk\release\app-release.apk
+```
+
+### Cutting a release
+
+[`.github/workflows/release.yml`](.github/workflows/release.yml) runs on every pushed tag `v*`. The
+tag must be `vX.Y.Z` (Y and Z below 100): it builds with versionName `X.Y.Z` and versionCode
+`X*10000 + Y*100 + Z` (v0.1.0 -> 100, v1.2.3 -> 10203), verifies the signature with `apksigner`
+and creates the GitHub Release `vX.Y.Z` with `troskovi-vX.Y.Z.apk` attached and auto-generated
+notes.
+
+```sh
+git tag v0.1.0 && git push --tags
+```
+
+Repository secrets (Settings > Secrets and variables > Actions), set once:
+
+| Secret | Value | PowerShell |
+|---|---|---|
+| `GOOGLE_SERVICES_JSON` | `app/google-services.json`, base64 | `[Convert]::ToBase64String([IO.File]::ReadAllBytes((Resolve-Path "app\google-services.json"))) \| Set-Clipboard` |
+| `TROSKOVI_KEYSTORE_BASE64` | `private/release.jks`, base64 | `[Convert]::ToBase64String([IO.File]::ReadAllBytes((Resolve-Path "private\release.jks"))) \| Set-Clipboard` |
+| `TROSKOVI_KEYSTORE_PASSWORD` | `storePassword` from `private/keystore.properties` | |
+| `TROSKOVI_KEY_PASSWORD` | `keyPassword` from `private/keystore.properties` | |
+| `TROSKOVI_KEY_ALIAS` | `troskovi` | |
+
+With the GitHub CLI: `gh secret set TROSKOVI_KEY_ALIAS --body troskovi`, and for the files
+`[Convert]::ToBase64String([IO.File]::ReadAllBytes((Resolve-Path "private\release.jks"))) | gh secret set TROSKOVI_KEYSTORE_BASE64`
+(on Linux/macOS: `base64 -w0 private/release.jks | gh secret set TROSKOVI_KEYSTORE_BASE64`). The
+workflow stops with an error naming any secret that is missing.
+
 ## Private data
 
 Everything personal stays out of git. Put it in `private/` (gitignored):
@@ -185,6 +248,8 @@ Everything personal stays out of git. Put it in `private/` (gitignored):
   `python tools/export_legacy.py` (install `tools/requirements.txt` first).
 - `private/members.json` – the two allow-listed Google accounts (input of `seed_members.py`).
 - `private/serviceAccountKey.json` – Firebase Admin key for the scripts in `tools/`.
+- `private/release.jks`, `private/keystore.properties` – the release signing key and its
+  passwords (see "Releases").
 
 When `private/legacy_popis.csv` exists, `:domain:test` also runs a golden test against the full
 history; otherwise that test is skipped. `google-services.json` (Firebase) and signing keystores are

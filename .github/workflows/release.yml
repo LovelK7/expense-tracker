@@ -1,0 +1,91 @@
+name: Release
+
+# Builds a signed release APK for a tag vX.Y.Z and publishes it as a GitHub Release
+# (README "Releases"). Needs the secrets GOOGLE_SERVICES_JSON, TROSKOVI_KEYSTORE_BASE64,
+# TROSKOVI_KEYSTORE_PASSWORD, TROSKOVI_KEY_PASSWORD and TROSKOVI_KEY_ALIAS.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # vX.Y.Z -> versionName X.Y.Z, versionCode X*10000 + Y*100 + Z (Y and Z below 100).
+      - name: Version from tag
+        id: version
+        run: |
+          if [[ ! "$TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "::error::Tag '$TAG' is not of the form vX.Y.Z"; exit 1
+          fi
+          major=$((10#${BASH_REMATCH[1]})); minor=$((10#${BASH_REMATCH[2]})); patch=$((10#${BASH_REMATCH[3]}))
+          if (( minor > 99 || patch > 99 )); then
+            echo "::error::Minor and patch must be below 100 for versionCode = X*10000 + Y*100 + Z"; exit 1
+          fi
+          code=$((major * 10000 + minor * 100 + patch))
+          if (( code < 1 )); then echo "::error::versionCode must be positive (v0.0.0 is not allowed)"; exit 1; fi
+          echo "name=$major.$minor.$patch" >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "versionName $major.$minor.$patch, versionCode $code"
+
+      - name: Check secrets
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          TROSKOVI_KEYSTORE_BASE64: ${{ secrets.TROSKOVI_KEYSTORE_BASE64 }}
+          TROSKOVI_KEYSTORE_PASSWORD: ${{ secrets.TROSKOVI_KEYSTORE_PASSWORD }}
+          TROSKOVI_KEY_PASSWORD: ${{ secrets.TROSKOVI_KEY_PASSWORD }}
+          TROSKOVI_KEY_ALIAS: ${{ secrets.TROSKOVI_KEY_ALIAS }}
+        run: |
+          missing=0
+          for name in GOOGLE_SERVICES_JSON TROSKOVI_KEYSTORE_BASE64 TROSKOVI_KEYSTORE_PASSWORD TROSKOVI_KEY_PASSWORD TROSKOVI_KEY_ALIAS; do
+            if [ -z "${!name}" ]; then echo "::error::Repository secret $name is not set"; missing=1; fi
+          done
+          exit $missing
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Write Firebase config
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: printf '%s' "$GOOGLE_SERVICES_JSON" | base64 --decode > app/google-services.json
+
+      - name: Build signed release APK
+        env:
+          TROSKOVI_KEYSTORE_BASE64: ${{ secrets.TROSKOVI_KEYSTORE_BASE64 }}
+          TROSKOVI_KEYSTORE_PASSWORD: ${{ secrets.TROSKOVI_KEYSTORE_PASSWORD }}
+          TROSKOVI_KEY_PASSWORD: ${{ secrets.TROSKOVI_KEY_PASSWORD }}
+          TROSKOVI_KEY_ALIAS: ${{ secrets.TROSKOVI_KEY_ALIAS }}
+        run: >
+          ./gradlew :app:assembleRelease
+          -PappVersionName=${{ steps.version.outputs.name }}
+          -PappVersionCode=${{ steps.version.outputs.code }}
+
+      # app-release.apk only exists when the build was signed (unsigned: app-release-unsigned.apk).
+      - name: Rename and verify APK
+        run: |
+          mv app/build/outputs/apk/release/app-release.apk "troskovi-$TAG.apk"
+          build_tools="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n 1)"
+          "$build_tools/apksigner" verify --print-certs "troskovi-$TAG.apk"
+          rm -f app/google-services.json
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$TAG" "troskovi-$TAG.apk" --title "$TAG" --generate-notes --verify-tag

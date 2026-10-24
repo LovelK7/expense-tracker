@@ -12,7 +12,13 @@ stage plan live in [`docs/DESIGN.md`](docs/DESIGN.md): read it before changing b
 .\gradlew.bat :app:assembleDebug           # -> app\build\outputs\apk\debug\app-debug.apk
 # Everything CI runs:
 .\gradlew.bat :domain:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+# Signed release APK (private/keystore.properties; quote -P args in PowerShell):
+.\gradlew.bat :app:assembleRelease "-PappVersionName=0.1.0-local" "-PappVersionCode=10000"
 ```
+
+Releases (README "Releases"): pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml`, which
+builds a signed APK from the `TROSKOVI_*` and `GOOGLE_SERVICES_JSON` secrets and publishes a GitHub
+Release. Without a signing config `assembleRelease` builds an unsigned APK with a warning.
 
 Emulator (AVD `Pixel_9_new`, API 35):
 
@@ -92,7 +98,8 @@ Never test the data scripts against the real project; use the emulator (`--emula
 - New domain logic gets JUnit 5 tests in `:domain` with synthetic fixtures. Tests using real data
   read from `private/` and must skip (JUnit `Assumptions`) when it is absent.
 - No secrets or personal data in git: `private/`, `google-services.json`, `local.properties`,
-  keystores are gitignored; commit `*.example` files instead. That includes
+  keystores (`private/release.jks`, `private/keystore.properties`) are gitignored; commit
+  `*.example` files instead. That includes
   `private/members.json` and `private/serviceAccountKey.json`; never put real member emails in
   code, tests or docs.
 - Repository writes are fire-and-forget (offline-first); snapshot listeners show them at once.
