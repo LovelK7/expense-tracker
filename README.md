@@ -84,6 +84,51 @@ python tools/deploy_rules.py             # publish firestore.rules (Firebase Rul
 to run against a project other than the key's. Seed the members first: until `config/members`
 exists the rules deny everyone, including the two members.
 
+#### Legacy history: import, verify, export
+
+Three scripts move the legacy history between `private/` and Firestore. All of them take
+`--emulator` (the local Firestore emulator, `FIRESTORE_EMULATOR_HOST`, default `127.0.0.1:8080`;
+no key needed) or use the real project with `private/serviceAccountKey.json`. Only the import
+writes, and it **refuses to write to the real project unless `--yes-real-project` is passed**.
+Recommended order: import, then verify, then export.
+
+```sh
+python tools/import_legacy.py --dry-run                 # parse + normalise, print counts and balance
+python tools/import_legacy.py --emulator [--limit 20]   # try it on the emulator first
+python tools/import_legacy.py --yes-real-project        # the real import
+python tools/verify_import.py [--emulator]              # read back, compare with the CSV: PASS/FAIL
+python tools/export_sheet.py [--emulator] [--since 2026-10-25] [--xlsx private/Financije_ML_2023.xlsx]
+```
+
+- `import_legacy.py` writes one `expenses/legacy-NNNN` document per row of
+  `private/legacy_popis.csv` (NNNN = 1-based CSV data row, the ids `LegacyCsvParser` uses), in
+  batches of 500, with the categories normalised like the app does, `createdBy` = payer and the
+  expense date at 00:00 UTC as `createdAt`/`updatedAt`. Re-running overwrites the same documents,
+  so it never duplicates; it stops instead if a stored `legacy-*` document differs from the CSV
+  (edited in the app), unless `--overwrite-changed`. It prints the balance read back from
+  Firestore: −53469 cents (−534,69 €) for the full 1,069-row history. One legacy row has a price of
+  0 €; it is imported as-is, but the rules only accept amounts above 0, so the app cannot edit or
+  delete that row (the import prints a warning).
+- `verify_import.py` prints the count, balance and per-category totals of everything in
+  `expenses/`, then compares the `legacy-*` documents with the CSV (count, balance, per-category
+  totals, every field by id). Exit code 1 on FAIL. Records added in the app are listed, not compared.
+- `export_sheet.py` writes `private/export_popis.csv` in the POPIS layout (`Datum`, `Kategorija`,
+  `Kupnja/trošak`, `Cijena €`, `Platio`, `Podjela/zajam`, `Mjesec`; `;`-separated, decimal comma,
+  UTF-8 with BOM) from all non-deleted expenses and settlements. Settlements become `Prijenos` rows
+  "Podmirenje: <note>" paid by the sender as `zajam`, which is how the sheet records a transfer.
+  `--xlsx` also writes `<name>.updated.xlsx` next to the workbook (the original is not modified):
+  the rows that are not already in it (everything except `legacy-*`) are appended to the POPIS
+  table, which is extended together with the pivot source and validations that tracked it.
+  openpyxl drops the chart styles and the web-extension pane in that copy; the category drop-down
+  is restored.
+
+Their unit tests (no Firestore needed; CI job `python-tools`):
+
+```sh
+python -m pip install --user -r tools/requirements-dev.txt
+python -m pytest tools/tests
+```
+
 ### Local development with the Firebase emulators
 
 Google sign-in cannot work on an Android emulator without a real account, so debug builds can

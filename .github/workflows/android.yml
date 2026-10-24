@@ -84,3 +84,21 @@ jobs:
       # Uses the demo-troskovi project id: no login, nothing leaves the runner.
       - name: Rules tests on the Firestore emulator
         run: npm run test:emulator
+
+  python-tools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: tools/requirements*.txt
+
+      - run: python -m pip install -r tools/requirements-dev.txt
+
+      # Pure logic only, no Firestore; private/ is absent, so the golden test is skipped.
+      - name: Admin tool unit tests
+        run: python -m pytest tools/tests -q

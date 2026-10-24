@@ -53,7 +53,13 @@ Legacy import (needs `private/Financije_ML_2023.xlsx`):
 ```powershell
 python -m pip install --user -r tools\requirements.txt
 python tools\export_legacy.py    # -> private\legacy_popis.csv, private\legacy_categories.txt
+python tools\import_legacy.py --emulator   # CSV -> expenses/legacy-NNNN (real project: --yes-real-project)
+python tools\verify_import.py --emulator   # read back, compare with the CSV, PASS/FAIL
+python tools\export_sheet.py --emulator --xlsx private\Financije_ML_2023.xlsx  # -> private\export_popis.csv
+python -m pytest tools\tests               # pure tool logic (tools\requirements-dev.txt)
 ```
+
+Never test the data scripts against the real project; use the emulator (`--emulator`).
 
 ## Layout
 
