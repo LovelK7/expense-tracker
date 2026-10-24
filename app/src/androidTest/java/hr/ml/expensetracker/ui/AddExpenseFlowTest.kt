@@ -4,6 +4,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -16,10 +17,12 @@ import hr.ml.expensetracker.domain.Expense
 import hr.ml.expensetracker.domain.ExpenseRepository
 import hr.ml.expensetracker.domain.Money
 import hr.ml.expensetracker.domain.Person
+import hr.ml.expensetracker.domain.RecurringRepository
 import hr.ml.expensetracker.domain.SettlementRepository
 import hr.ml.expensetracker.domain.SplitType
 import hr.ml.expensetracker.session.CurrentPerson
 import hr.ml.expensetracker.testing.InMemoryExpenseRepository
+import hr.ml.expensetracker.testing.InMemoryRecurringRepository
 import hr.ml.expensetracker.testing.InMemorySettlementRepository
 import hr.ml.expensetracker.ui.expense.ExpenseFormTags
 import hr.ml.expensetracker.ui.theme.TroskoviTheme
@@ -49,6 +52,7 @@ class AddExpenseFlowTest {
     private val fakes = module {
         single<ExpenseRepository> { expenses }
         single<SettlementRepository> { settlements }
+        single<RecurringRepository> { InMemoryRecurringRepository() }
         single<CurrentPerson> { CurrentPerson { Person.LOVEL } }
     }
 
@@ -71,6 +75,14 @@ class AddExpenseFlowTest {
         compose.onNodeWithTag(ExpenseFormTags.SAVE).assertIsNotEnabled()
         compose.onNodeWithTag(ExpenseFormTags.AMOUNT).performTextInput("12,5")
         compose.onNodeWithText("Hrana").performClick()
+
+        // The grid collapses to the chosen chip; tapping it opens the grid to pick another one.
+        compose.onNodeWithTag(ExpenseFormTags.CATEGORY_SELECTED).assertIsDisplayed().assertTextContains("Hrana")
+        assertEquals(0, compose.onAllNodesWithTag(ExpenseFormTags.CATEGORY_CHIP).fetchSemanticsNodes().size)
+        compose.onNodeWithTag(ExpenseFormTags.CATEGORY_SELECTED).performClick()
+        assertEquals(Categories.FOR_PICKER.size, compose.onAllNodesWithTag(ExpenseFormTags.CATEGORY_CHIP).fetchSemanticsNodes().size)
+        compose.onNodeWithText("Prijevoz").performClick()
+        compose.onNodeWithTag(ExpenseFormTags.CATEGORY_SELECTED).assertTextContains("Prijevoz")
         compose.onNodeWithTag(ExpenseFormTags.SAVE).assertIsEnabled()
         compose.onNodeWithText("Spremi ${euros(1250)}").assertIsDisplayed()
         compose.onNodeWithTag(ExpenseFormTags.SAVE).performClick()
@@ -84,7 +96,7 @@ class AddExpenseFlowTest {
 
         val saved = expenses.records.value.values.single()
         assertEquals(1250L, saved.amountCents)
-        assertEquals("Hrana", saved.category)
+        assertEquals("Prijevoz", saved.category)
         assertEquals(Person.LOVEL, saved.paidBy)
         assertEquals(SplitType.HALF, saved.split)
         assertEquals(Person.LOVEL, saved.createdBy)

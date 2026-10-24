@@ -74,13 +74,15 @@ Never test the data scripts against the real project; use the emulator (`--emula
   transfers, comparisons, category and year trends), `Analytics`/`Habits` (Statistika's Trendovi
   and Navike: time series, spending habits), `CategoryNormalizer`, `Money`, `LegacyCsvParser`, `Members`,
   `RecordFilter`/`SearchText` (home month filter + diacritics-insensitive search), `CroatianPlural`,
-  repository interfaces (`ExpenseRepository`, `SettlementRepository`).
+  `RecurringTemplate`/`RecurringSchedule` (monthly templates, due items, deterministic
+  `rec-<templateId>-<yyyy-MM>` expense ids), repository interfaces (`ExpenseRepository`,
+  `SettlementRepository`, `RecurringRepository`).
 - `:app` – Compose + Material 3 UI, ViewModels exposing `StateFlow`, Koin DI (`di/AppModule.kt`).
   Package `hr.ml.expensetracker`. `data/` = Firestore mappers and repositories; `session/` =
   Google sign-in, Firebase Auth and the `config/members` allow-list
   (`SessionRepository.currentPerson`, injected as `CurrentPerson`, is the `createdBy` for new
   records). `ui/` = `AppShell` (tabs + the expense editor overlay), `home/`, `expense/` (add/edit
-  form), `stats/` (Statistika: inner tabs Brojke, Trendovi, Navike; stats computed on `Dispatchers.Default`),
+  form), `recurring/` (Predlošci: template list and form, a full-screen overlay), `stats/` (Statistika: inner tabs Brojke, Trendovi, Navike; stats computed on `Dispatchers.Default`),
   `charts/` (Canvas charts: line, column/stacked, sparkline, calendar heatmap; plain data in, no
   ViewModels), `common/` (incl. `CategoryVisuals`:
   icon + colour per category), `theme/` (fixed light/dark palette, `AppTheme.colors` extras,

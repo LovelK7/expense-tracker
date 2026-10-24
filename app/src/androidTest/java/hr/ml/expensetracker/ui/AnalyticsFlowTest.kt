@@ -17,10 +17,12 @@ import hr.ml.expensetracker.domain.Expense
 import hr.ml.expensetracker.domain.ExpenseRepository
 import hr.ml.expensetracker.domain.Money
 import hr.ml.expensetracker.domain.Person
+import hr.ml.expensetracker.domain.RecurringRepository
 import hr.ml.expensetracker.domain.SettlementRepository
 import hr.ml.expensetracker.domain.SplitType
 import hr.ml.expensetracker.session.CurrentPerson
 import hr.ml.expensetracker.testing.InMemoryExpenseRepository
+import hr.ml.expensetracker.testing.InMemoryRecurringRepository
 import hr.ml.expensetracker.testing.InMemorySettlementRepository
 import hr.ml.expensetracker.ui.stats.StatsTab
 import hr.ml.expensetracker.ui.stats.StatsTags
@@ -61,6 +63,7 @@ class AnalyticsFlowTest {
     private val fakes = module {
         single<ExpenseRepository> { expenses }
         single<SettlementRepository> { InMemorySettlementRepository() }
+        single<RecurringRepository> { InMemoryRecurringRepository() }
         single<CurrentPerson> { CurrentPerson { Person.LOVEL } }
     }
 

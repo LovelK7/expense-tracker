@@ -4,6 +4,7 @@ import com.google.firebase.Timestamp
 import hr.ml.expensetracker.domain.Expense
 import hr.ml.expensetracker.domain.Members
 import hr.ml.expensetracker.domain.Person
+import hr.ml.expensetracker.domain.RecurringTemplate
 import hr.ml.expensetracker.domain.Settlement
 import hr.ml.expensetracker.domain.SplitType
 import java.time.Instant
@@ -18,6 +19,7 @@ import java.time.format.DateTimeParseException
 object Firestore {
     const val EXPENSES = "expenses"
     const val SETTLEMENTS = "settlements"
+    const val RECURRING = "recurring"
     const val CONFIG = "config"
     const val MEMBERS_DOC = "members"
 
@@ -34,6 +36,16 @@ object Firestore {
     const val UPDATED_AT = "updatedAt"
     const val CREATED_BY = "createdBy"
     const val DELETED = "deleted"
+
+    // Expenses posted from a recurring template: both or neither.
+    const val TEMPLATE_ID = "templateId"
+    const val PERIOD = "period"
+
+    // recurring/{id}
+    const val NAME = "name"
+    const val DAY_OF_MONTH = "dayOfMonth"
+    const val ACTIVE = "active"
+    const val SKIPPED_PERIODS = "skippedPeriods"
 
     const val EMAILS = "emails"
     const val PERSONS = "persons"
@@ -58,6 +70,24 @@ private class Reader(private val data: Map<String, Any?>) {
 
     fun bool(key: String): Boolean = data[key] as? Boolean ?: bad(key)
 
+    /** An optional string: absent (or null) reads as null. */
+    fun optionalString(key: String): String? = when (val v = data[key]) {
+        null -> null
+        is String -> v
+        else -> bad(key)
+    }
+
+    fun int(key: String): Int {
+        val v = long(key)
+        if (v !in Int.MIN_VALUE..Int.MAX_VALUE) bad(key)
+        return v.toInt()
+    }
+
+    fun strings(key: String): List<String> {
+        val list = data[key] as? List<*> ?: bad(key)
+        return list.map { it as? String ?: bad(key) }
+    }
+
     fun date(key: String): LocalDate = try {
         LocalDate.parse(string(key), ISO_DATE)
     } catch (e: DateTimeParseException) {
@@ -75,18 +105,21 @@ private class Reader(private val data: Map<String, Any?>) {
 }
 
 object ExpenseMapper {
-    fun toDocument(e: Expense): Map<String, Any> = mapOf(
-        Firestore.DATE to e.date.toIso(),
-        Firestore.CATEGORY to e.category,
-        Firestore.DESCRIPTION to e.description,
-        Firestore.AMOUNT_CENTS to e.amountCents,
-        Firestore.PAID_BY to e.paidBy.name,
-        Firestore.SPLIT to e.split.name,
-        Firestore.CREATED_AT to e.createdAt.toTimestamp(),
-        Firestore.UPDATED_AT to e.updatedAt.toTimestamp(),
-        Firestore.CREATED_BY to e.createdBy.name,
-        Firestore.DELETED to e.deleted,
-    )
+    /** [Expense.templateId] and [Expense.period] are written only when set (never on legacy rows). */
+    fun toDocument(e: Expense): Map<String, Any> = buildMap {
+        put(Firestore.DATE, e.date.toIso())
+        put(Firestore.CATEGORY, e.category)
+        put(Firestore.DESCRIPTION, e.description)
+        put(Firestore.AMOUNT_CENTS, e.amountCents)
+        put(Firestore.PAID_BY, e.paidBy.name)
+        put(Firestore.SPLIT, e.split.name)
+        put(Firestore.CREATED_AT, e.createdAt.toTimestamp())
+        put(Firestore.UPDATED_AT, e.updatedAt.toTimestamp())
+        put(Firestore.CREATED_BY, e.createdBy.name)
+        put(Firestore.DELETED, e.deleted)
+        e.templateId?.let { put(Firestore.TEMPLATE_ID, it) }
+        e.period?.let { put(Firestore.PERIOD, it) }
+    }
 
     /** @throws IllegalArgumentException when a field is missing or malformed. */
     fun fromDocument(id: String, data: Map<String, Any?>): Expense = with(Reader(data)) {
@@ -102,6 +135,8 @@ object ExpenseMapper {
             updatedAt = instant(Firestore.UPDATED_AT),
             createdBy = person(Firestore.CREATED_BY),
             deleted = bool(Firestore.DELETED),
+            templateId = optionalString(Firestore.TEMPLATE_ID),
+            period = optionalString(Firestore.PERIOD),
         )
     }
 }
@@ -128,6 +163,45 @@ object SettlementMapper {
             to = person(Firestore.TO),
             amountCents = long(Firestore.AMOUNT_CENTS),
             note = string(Firestore.NOTE),
+            createdAt = instant(Firestore.CREATED_AT),
+            updatedAt = instant(Firestore.UPDATED_AT),
+            createdBy = person(Firestore.CREATED_BY),
+            deleted = bool(Firestore.DELETED),
+        )
+    }
+}
+
+/** `recurring/{id}`: a [RecurringTemplate]; `skippedPeriods` is a sorted list of "yyyy-MM" strings. */
+object RecurringMapper {
+    fun toDocument(t: RecurringTemplate): Map<String, Any> = mapOf(
+        Firestore.NAME to t.name,
+        Firestore.CATEGORY to t.category,
+        Firestore.DESCRIPTION to t.description,
+        Firestore.AMOUNT_CENTS to t.amountCents,
+        Firestore.PAID_BY to t.paidBy.name,
+        Firestore.SPLIT to t.split.name,
+        Firestore.DAY_OF_MONTH to t.dayOfMonth.toLong(),
+        Firestore.ACTIVE to t.active,
+        Firestore.SKIPPED_PERIODS to t.skippedPeriods.sorted(),
+        Firestore.CREATED_AT to t.createdAt.toTimestamp(),
+        Firestore.UPDATED_AT to t.updatedAt.toTimestamp(),
+        Firestore.CREATED_BY to t.createdBy.name,
+        Firestore.DELETED to t.deleted,
+    )
+
+    /** @throws IllegalArgumentException when a field is missing or malformed. */
+    fun fromDocument(id: String, data: Map<String, Any?>): RecurringTemplate = with(Reader(data)) {
+        RecurringTemplate(
+            id = id,
+            name = string(Firestore.NAME),
+            category = string(Firestore.CATEGORY),
+            description = string(Firestore.DESCRIPTION),
+            amountCents = long(Firestore.AMOUNT_CENTS),
+            paidBy = person(Firestore.PAID_BY),
+            split = split(Firestore.SPLIT),
+            dayOfMonth = int(Firestore.DAY_OF_MONTH),
+            active = bool(Firestore.ACTIVE),
+            skippedPeriods = strings(Firestore.SKIPPED_PERIODS).toSet(),
             createdAt = instant(Firestore.CREATED_AT),
             updatedAt = instant(Firestore.UPDATED_AT),
             createdBy = person(Firestore.CREATED_BY),

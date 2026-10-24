@@ -1,11 +1,10 @@
 package hr.ml.expensetracker.ui.expense
 
 import androidx.activity.compose.BackHandler
-import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,25 +12,25 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -54,10 +53,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import hr.ml.expensetracker.R
 import hr.ml.expensetracker.domain.Money
 import hr.ml.expensetracker.domain.Person
+import hr.ml.expensetracker.domain.RecurringTemplate
 import hr.ml.expensetracker.domain.SplitType
+import hr.ml.expensetracker.ui.common.CategoryPicker
 import hr.ml.expensetracker.ui.common.CategoryVisuals
 import hr.ml.expensetracker.ui.common.DateField
-import hr.ml.expensetracker.ui.common.label
+import hr.ml.expensetracker.ui.common.FormTags
+import hr.ml.expensetracker.ui.common.PaidByField
+import hr.ml.expensetracker.ui.common.SectionLabel
+import hr.ml.expensetracker.ui.common.SplitField
 import hr.ml.expensetracker.ui.theme.TroskoviTheme
 import java.time.LocalDate
 import org.koin.androidx.compose.koinViewModel
@@ -65,17 +69,27 @@ import org.koin.androidx.compose.koinViewModel
 object ExpenseFormTags {
     const val AMOUNT = "expense_amount"
     const val SAVE = "expense_save"
-    const val CATEGORY_CHIP = "expense_category_chip"
+    const val CATEGORY_CHIP = FormTags.CATEGORY_CHIP
+    const val CATEGORY_SELECTED = FormTags.CATEGORY_SELECTED
+    const val TEMPLATE_CHIPS = "expense_template_chips"
+    const val EDIT_TEMPLATES = "expense_edit_templates"
+
+    fun templateChip(id: String) = "expense_template_$id"
 }
 
-/** The "Dodaj" tab: amount (focused, keyboard open), category, save. */
+/**
+ * The "Dodaj" tab: the "Predlošci" chips (when there are templates), amount (focused, keyboard
+ * open), category, save. A template chip prefills the form; [onEditTemplates] opens Predlošci.
+ */
 @Composable
 fun AddExpenseScreen(
     onSaved: () -> Unit,
+    onEditTemplates: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ExpenseFormViewModel = koinViewModel(key = "add-expense"),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val templates by viewModel.templates.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.resetIfPristine() }
     ExpenseForm(
         state = state,
@@ -83,7 +97,52 @@ fun AddExpenseScreen(
         onSave = { if (viewModel.save()) onSaved() },
         focusAmount = true,
         modifier = modifier,
+        header = if (templates.isEmpty()) {
+            null
+        } else {
+            { TemplateChips(templates, onApply = viewModel::applyTemplate, onEditTemplates = onEditTemplates) }
+        },
     )
+}
+
+/** "Predlošci" with "Uredi predloške", then one chip per active template; scrolls sideways. */
+@Composable
+private fun TemplateChips(
+    templates: List<RecurringTemplate>,
+    onApply: (RecurringTemplate) -> Unit,
+    onEditTemplates: () -> Unit,
+) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            SectionLabel(R.string.templates_title, Modifier.weight(1f))
+            TextButton(onClick = onEditTemplates, modifier = Modifier.testTag(ExpenseFormTags.EDIT_TEMPLATES)) {
+                Text(stringResource(R.string.templates_edit))
+            }
+        }
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().testTag(ExpenseFormTags.TEMPLATE_CHIPS),
+        ) {
+            items(templates, key = { it.id }) { t ->
+                AssistChip(
+                    onClick = { onApply(t) },
+                    label = { Text(stringResource(R.string.template_chip, t.name, Money.format(t.amountCents)), maxLines = 1) },
+                    leadingIcon = {
+                        Icon(
+                            painterResource(CategoryVisuals.icon(t.category)),
+                            contentDescription = null,
+                            tint = CategoryVisuals.tint(t.category),
+                            modifier = Modifier.size(AssistChipDefaults.IconSize),
+                        )
+                    },
+                    shape = CircleShape,
+                    border = null,
+                    colors = AssistChipDefaults.assistChipColors(containerColor = CategoryVisuals.container(t.category)),
+                    modifier = Modifier.height(36.dp).testTag(ExpenseFormTags.templateChip(t.id)),
+                )
+            }
+        }
+    }
 }
 
 /** Full-screen editor for an existing expense, layered over the tabs. */
@@ -137,11 +196,13 @@ private fun ExpenseForm(
     onSave: () -> Unit,
     focusAmount: Boolean,
     modifier: Modifier = Modifier,
+    header: (@Composable () -> Unit)? = null,
 ) {
     ExpenseFormContent(
         state = state,
         onAmountChange = viewModel::onAmountChange,
         onCategorySelect = viewModel::onCategorySelect,
+        onExpandCategories = viewModel::expandCategories,
         onDescriptionChange = viewModel::onDescriptionChange,
         onPaidByChange = viewModel::onPaidByChange,
         onSplitChange = viewModel::onSplitChange,
@@ -149,6 +210,7 @@ private fun ExpenseForm(
         onSave = onSave,
         focusAmount = focusAmount,
         modifier = modifier,
+        header = header,
     )
 }
 
@@ -157,6 +219,7 @@ private fun ExpenseFormContent(
     state: ExpenseFormState,
     onAmountChange: (String) -> Unit,
     onCategorySelect: (String) -> Unit,
+    onExpandCategories: () -> Unit,
     onDescriptionChange: (String) -> Unit,
     onPaidByChange: (Person) -> Unit,
     onSplitChange: (SplitType) -> Unit,
@@ -164,6 +227,7 @@ private fun ExpenseFormContent(
     onSave: () -> Unit,
     focusAmount: Boolean,
     modifier: Modifier = Modifier,
+    header: (@Composable () -> Unit)? = null,
 ) {
     val focusManager = LocalFocusManager.current
     val amountFocus = remember { FocusRequester() }
@@ -176,6 +240,7 @@ private fun ExpenseFormContent(
             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            header?.invoke()
             OutlinedTextField(
                 value = state.amountText,
                 onValueChange = onAmountChange,
@@ -190,14 +255,13 @@ private fun ExpenseFormContent(
             )
 
             SectionLabel(R.string.category_label)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                state.categories.forEach { category ->
-                    CategoryChip(category, selected = category == state.category, onClick = { onCategorySelect(category) })
-                }
-            }
+            CategoryPicker(
+                categories = state.categories,
+                selected = state.category,
+                expanded = state.categoriesExpanded,
+                onSelect = onCategorySelect,
+                onExpand = onExpandCategories,
+            )
 
             OutlinedTextField(
                 value = state.description,
@@ -208,36 +272,8 @@ private fun ExpenseFormContent(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            SectionLabel(R.string.paid_by_label)
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                Person.entries.forEachIndexed { index, person ->
-                    SegmentedButton(
-                        selected = state.paidBy == person,
-                        onClick = { onPaidByChange(person) },
-                        shape = SegmentedButtonDefaults.itemShape(index, Person.entries.size),
-                    ) { Text(stringResource(person.label)) }
-                }
-            }
-
-            SectionLabel(R.string.split_label)
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                SplitType.entries.forEachIndexed { index, split ->
-                    SegmentedButton(
-                        selected = state.split == split,
-                        onClick = { onSplitChange(split) },
-                        shape = SegmentedButtonDefaults.itemShape(index, SplitType.entries.size),
-                    ) { Text(stringResource(split.label)) }
-                }
-            }
-            Text(
-                text = when (state.split) {
-                    SplitType.HALF -> stringResource(R.string.split_half_hint)
-                    SplitType.FULL_FOR_OTHER ->
-                        stringResource(R.string.split_full_hint, stringResource(state.paidBy.other.label))
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            PaidByField(state.paidBy, onPaidByChange)
+            SplitField(state.split, state.paidBy, onSplitChange)
 
             SectionLabel(R.string.date_label)
             DateField(date = state.date, today = state.today, onDateChange = onDateChange)
@@ -264,53 +300,16 @@ private fun ExpenseFormContent(
     }
 }
 
-/** A filled tonal pill with the category icon; selected, it takes the category colour. */
-@Composable
-private fun CategoryChip(category: String, selected: Boolean, onClick: () -> Unit) {
-    val tint = CategoryVisuals.tint(category)
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(category) },
-        leadingIcon = {
-            Icon(
-                painterResource(CategoryVisuals.icon(category)),
-                contentDescription = null,
-                modifier = Modifier.size(FilterChipDefaults.IconSize),
-            )
-        },
-        shape = CircleShape,
-        border = null,
-        colors = FilterChipDefaults.filterChipColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            labelColor = MaterialTheme.colorScheme.onSurface,
-            iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            selectedContainerColor = CategoryVisuals.container(category),
-            selectedLabelColor = MaterialTheme.colorScheme.onSurface,
-            selectedLeadingIconColor = tint,
-        ),
-        modifier = Modifier.height(36.dp).testTag(ExpenseFormTags.CATEGORY_CHIP),
-    )
-}
-
-@Composable
-private fun SectionLabel(@StringRes text: Int) {
-    Text(
-        text = stringResource(text),
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
 @Preview(showBackground = true, heightDp = 800)
 @Composable
 private fun ExpenseFormPreview() {
     val today = LocalDate.of(2026, 10, 24)
     TroskoviTheme {
         ExpenseFormContent(
-            state = ExpenseFormState(amountText = "12,5", category = "Hrana", date = today, today = today),
+            state = ExpenseFormState(amountText = "12,5", category = "Hrana", date = today, today = today, categoriesExpanded = false),
             onAmountChange = {},
             onCategorySelect = {},
+            onExpandCategories = {},
             onDescriptionChange = {},
             onPaidByChange = {},
             onSplitChange = {},

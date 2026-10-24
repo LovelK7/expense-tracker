@@ -6,6 +6,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.MetadataChanges
 import hr.ml.expensetracker.domain.Expense
 import hr.ml.expensetracker.domain.ExpenseRepository
+import hr.ml.expensetracker.domain.RecurringRepository
+import hr.ml.expensetracker.domain.RecurringTemplate
 import hr.ml.expensetracker.domain.Settlement
 import hr.ml.expensetracker.domain.SettlementRepository
 import java.time.Instant
@@ -28,6 +30,7 @@ internal class RecordCollection<T>(
     private val collection: CollectionReference,
     private val toDocument: (T) -> Map<String, Any>,
     private val fromDocument: (String, Map<String, Any?>) -> T,
+    /** The order [observeAll] emits (newest first for expenses and settlements). */
     private val newestFirst: Comparator<T>,
     private val clock: () -> Instant,
 ) {
@@ -52,6 +55,29 @@ internal class RecordCollection<T>(
     }.distinctUntilChanged()
 
     fun newId(): String = collection.document().id
+
+    /**
+     * Writes [record] under [id]; if that document already exists, the stored `createdBy` and
+     * `createdAt` are kept (the rules never let them change). The existence check reads the
+     * server, or the local cache while offline; when neither knows the document it is created.
+     */
+    fun setKeepingAuthorship(id: String, record: T) {
+        val doc = collection.document(id)
+        doc.get()
+            .addOnSuccessListener { snapshot ->
+                val stored = snapshot.data
+                val fields = toDocument(record).toMutableMap()
+                if (snapshot.exists() && stored != null) {
+                    stored[Firestore.CREATED_BY]?.let { fields[Firestore.CREATED_BY] = it }
+                    stored[Firestore.CREATED_AT]?.let { fields[Firestore.CREATED_AT] = it }
+                }
+                doc.set(fields).addOnFailureListener { Log.w(TAG, "write ${collection.path}/$id failed", it) }
+            }
+            .addOnFailureListener {
+                // Offline and not cached: nobody here has seen it, so create it.
+                set(id, record)
+            }
+    }
 
     fun set(id: String, record: T) {
         collection.document(id).set(toDocument(record))
@@ -82,6 +108,8 @@ class FirestoreExpenseRepository(db: FirebaseFirestore, clock: () -> Instant = I
 
     override fun update(expense: Expense) = records.set(expense.id, expense)
 
+    override fun addOrRestore(expense: Expense) = records.setKeepingAuthorship(expense.id, expense)
+
     override fun softDelete(id: String) = records.softDelete(id)
 }
 
@@ -104,3 +132,24 @@ class FirestoreSettlementRepository(db: FirebaseFirestore, clock: () -> Instant 
 
     override fun softDelete(id: String) = records.softDelete(id)
 }
+
+class FirestoreRecurringRepository(db: FirebaseFirestore, clock: () -> Instant = Instant::now) : RecurringRepository {
+    private val records = RecordCollection(
+        collection = db.collection(Firestore.RECURRING),
+        toDocument = RecurringMapper::toDocument,
+        fromDocument = RecurringMapper::fromDocument,
+        newestFirst = RecurringTemplate.BY_NAME,
+        clock = clock,
+    )
+
+    override fun observeAll() = records.observeAll()
+
+    override fun newId() = records.newId()
+
+    override fun add(template: RecurringTemplate) = records.set(template.id, template)
+
+    override fun update(template: RecurringTemplate) = records.set(template.id, template)
+
+    override fun softDelete(id: String) = records.softDelete(id)
+}
+

@@ -26,7 +26,7 @@ CI runs the same command on every push and pull request to `main` (with
 
 | Module | What |
 |---|---|
-| `domain` | Plain Kotlin: expenses, settlements, balance calculation, statistics, CSV import. |
+| `domain` | Plain Kotlin: expenses, settlements, recurring templates, balance calculation, statistics, CSV import. |
 | `app` | The Android app (Compose UI, Koin). |
 | `tools` | Python admin scripts: legacy import, Firestore member allow-list, rules deployment. |
 | `firebase/rules-tests` | Firestore security rules tests (Node, Firestore emulator). |
@@ -39,6 +39,26 @@ top bar searches category and description, ignoring case and diacritics ("rezije
 "Režije"; several words must all match). Both combine, and a line above the list then sums the
 shown expenses ("23 troška · 312,40 €"). Edit, delete with undo and settle up work as usual on a
 filtered list.
+
+### Recurring templates (Predlošci)
+
+A template is a monthly expense such as rent: name, category, description, amount, payer, split,
+day of the month (1–31; in shorter months the last day) and an active switch. Manage them in
+**Predlošci** (the repeat icon in the top bar, or "Uredi predloške" on the Dodaj tab); an
+expense's "⋮" menu on Početna has **Spremi kao predložak**, which opens a new template prefilled
+from it (name = description or category, day = the expense's day).
+
+- **Dospjelo** cards on Početna, above the month chips: one per active template whose day has
+  come this month (and, marked "Zaostalo", last month's if it was not posted or skipped). **Dodaj**
+  posts the expense dated that day under the id `rec-<templateId>-<yyyy-MM>`, so the two phones
+  posting the same month write one document; the card disappears once it exists. **Preskoči**
+  skips that month (with undo). A template is never due for a month before it was created.
+- **Dodaj tab**: a "Predlošci" row of chips (hidden without templates); a chip fills the whole
+  form (dated today) and Spremi saves an ordinary expense.
+
+Picking a category on the add, edit and template forms collapses the chip grid to the chosen chip
+(with a chevron), so the description and the save button stay on screen; tap the chip to choose
+another.
 
 ### Statistika
 
@@ -130,6 +150,10 @@ Data layout:
 | `config/members` | `emails: [string]` (lowercase), `persons: { "<email>": "LOVEL" \| "MARINA" }` |
 | `expenses/{id}` | `date` (`yyyy-MM-dd`), `category`, `description`, `amountCents` (int), `paidBy`, `split`, `createdAt`, `updatedAt` (timestamps), `createdBy`, `deleted` |
 | `settlements/{id}` | `date`, `from`, `to`, `amountCents`, `note`, `createdAt`, `updatedAt`, `createdBy`, `deleted` |
+| `recurring/{id}` | `name`, `category`, `description`, `amountCents`, `paidBy`, `split`, `dayOfMonth` (int 1–31), `active` (bool), `skippedPeriods` (`["yyyy-MM"]`), `createdAt`, `updatedAt`, `createdBy`, `deleted` |
+
+An expense posted from a template (id `rec-<templateId>-<yyyy-MM>`) also has `templateId` and
+`period` (`yyyy-MM`), always both; other expenses (and every legacy row) have neither.
 
 Ids are generated on the client and are the document ids. Records are never deleted, only flagged
 `deleted: true`. [`firestore.rules`](firestore.rules) lets only allow-listed accounts (verified

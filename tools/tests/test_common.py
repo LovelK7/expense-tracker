@@ -170,6 +170,21 @@ def test_rule_validator_accepts_imported_documents_and_flags_zero_amounts():
     assert fc.expense_rule_violations({**doc, "createdAt": "2023-01-02"})
 
 
+def test_rule_validator_accepts_template_fields_only_as_a_pair():
+    """firestore.rules validExpenseFields: templateId + period together, or neither."""
+    doc = fc.legacy_expense_document(row())
+    assert not set(fc.EXPENSE_TEMPLATE_FIELDS) & set(doc)  # legacy rows have neither
+    posted = {**doc, "templateId": "abc123", "period": "2026-10"}
+    assert fc.expense_rule_violations(posted) == []
+    assert fc.expense_rule_violations({**doc, "templateId": "abc123"})
+    assert fc.expense_rule_violations({**doc, "period": "2026-10"})
+    for period in ("2026-1", "2026-13", "2026-00", "2026-10-01", "10/2026", 202610):
+        assert any("period" in p for p in fc.expense_rule_violations({**posted, "period": period})), period
+    for template_id in ("", "x" * 65, 7, None):
+        assert any("templateId" in p for p in fc.expense_rule_violations({**posted, "templateId": template_id}))
+    assert fc.expense_rule_violations({**posted, "templateId": "x" * 64}) == []
+
+
 def test_read_legacy_csv(tmp_path):
     path = tmp_path / "legacy.csv"
     path.write_text("﻿date,category,description,amount_cents,paid_by,split\r\n"

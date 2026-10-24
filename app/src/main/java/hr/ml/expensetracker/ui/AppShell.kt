@@ -42,9 +42,14 @@ import hr.ml.expensetracker.ui.home.HomeScreen
 import hr.ml.expensetracker.ui.home.HomeSearchField
 import hr.ml.expensetracker.ui.home.HomeTags
 import hr.ml.expensetracker.ui.home.HomeViewModel
+import hr.ml.expensetracker.ui.recurring.TemplatesScreen
 import hr.ml.expensetracker.ui.stats.StatisticsScreen
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+
+object ShellTags {
+    const val TEMPLATES = "shell_templates"
+}
 
 private enum class Destination(@param:StringRes val label: Int, @param:DrawableRes val icon: Int) {
     HOME(R.string.nav_home, R.drawable.ic_home),
@@ -52,15 +57,19 @@ private enum class Destination(@param:StringRes val label: Int, @param:DrawableR
     STATS(R.string.nav_stats, R.drawable.ic_bar_chart),
 }
 
-/** The signed-in app: three tabs, plus the expense editor layered over them. */
+/** The signed-in app: three tabs, plus the expense editor and "Predlošci" layered over them. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppShell(person: Person, onSignOut: () -> Unit) {
     var current by rememberSaveable { mutableStateOf(Destination.HOME) }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
+    var templatesOpen by rememberSaveable { mutableStateOf(false) }
+    // Set by "Spremi kao predložak": Predlošci opens on a template prefilled from this expense.
+    var templateFromExpense by rememberSaveable { mutableStateOf<String?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val savedMessage = stringResource(R.string.expense_saved)
+    val templateSavedMessage = stringResource(R.string.template_saved)
     val onSaved: () -> Unit = {
         current = Destination.HOME
         editingId = null
@@ -71,7 +80,7 @@ fun AppShell(person: Person, onSignOut: () -> Unit) {
     val home: HomeViewModel = koinViewModel()
     val searchOpen by home.searchOpen.collectAsStateWithLifecycle()
     val searching = searchOpen && current == Destination.HOME
-    BackHandler(enabled = searching && editingId == null, onBack = home::closeSearch)
+    BackHandler(enabled = searching && editingId == null && !templatesOpen, onBack = home::closeSearch)
 
     Box(Modifier.fillMaxSize()) {
         Scaffold(
@@ -96,6 +105,7 @@ fun AppShell(person: Person, onSignOut: () -> Unit) {
                         person = person,
                         showSearch = current == Destination.HOME,
                         onSearch = home::openSearch,
+                        onTemplates = { templatesOpen = true },
                         onSignOut = onSignOut,
                     )
                 }
@@ -121,23 +131,51 @@ fun AppShell(person: Person, onSignOut: () -> Unit) {
                     snackbar = snackbar,
                     scope = scope,
                     onEditExpense = { editingId = it },
+                    onSaveAsTemplate = {
+                        templateFromExpense = it
+                        templatesOpen = true
+                    },
                     modifier = modifier,
                     viewModel = home,
                 )
-                Destination.ADD -> AddExpenseScreen(onSaved = onSaved, modifier = modifier)
+                Destination.ADD -> AddExpenseScreen(
+                    onSaved = onSaved,
+                    onEditTemplates = { templatesOpen = true },
+                    modifier = modifier,
+                )
                 Destination.STATS -> StatisticsScreen(modifier = modifier)
             }
         }
         editingId?.let { id ->
             EditExpenseScreen(expenseId = id, onClose = { editingId = null }, onSaved = onSaved)
         }
+        if (templatesOpen) {
+            val close = {
+                templatesOpen = false
+                templateFromExpense = null
+            }
+            TemplatesScreen(
+                fromExpenseId = templateFromExpense,
+                onClose = close,
+                onSavedAndClosed = {
+                    close()
+                    scope.launch { snackbar.showSnackbar(templateSavedMessage) }
+                },
+            )
+        }
     }
 }
 
-/** App name, the search button (on "Početna"), the signed-in person and sign-out. */
+/** App name, the search button (on "Početna"), "Predlošci", the signed-in person and sign-out. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MainTopBar(person: Person, showSearch: Boolean, onSearch: () -> Unit, onSignOut: () -> Unit) {
+private fun MainTopBar(
+    person: Person,
+    showSearch: Boolean,
+    onSearch: () -> Unit,
+    onTemplates: () -> Unit,
+    onSignOut: () -> Unit,
+) {
     TopAppBar(
         title = { Text(stringResource(R.string.app_name)) },
         actions = {
@@ -145,6 +183,9 @@ private fun MainTopBar(person: Person, showSearch: Boolean, onSearch: () -> Unit
                 IconButton(onClick = onSearch, modifier = Modifier.testTag(HomeTags.SEARCH_OPEN)) {
                     Icon(painterResource(R.drawable.ic_search), contentDescription = stringResource(R.string.search))
                 }
+            }
+            IconButton(onClick = onTemplates, modifier = Modifier.testTag(ShellTags.TEMPLATES)) {
+                Icon(painterResource(R.drawable.ic_repeat), contentDescription = stringResource(R.string.templates_title))
             }
             Text(
                 text = stringResource(person.label),

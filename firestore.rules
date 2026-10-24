@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// Troškovi: two allow-listed Google accounts share expenses and settlements.
+// Troškovi: two allow-listed Google accounts share expenses, settlements and recurring templates.
 //
 // config/members = { emails: [string], persons: { "<email>": "LOVEL" | "MARINA" } }
 // (lowercase emails; written only by tools/seed_members.py with the Admin SDK, which bypasses
@@ -49,9 +49,33 @@ service cloud.firestore {
       return d.keys().hasAll(fields) && d.keys().hasOnly(fields);
     }
 
-    function validExpense(d) {
+    // A month: "yyyy-MM" (01..12).
+    function isPeriod(v) {
+      return v is string && v.matches('^\\d{4}-(0[1-9]|1[0-2])$');
+    }
+
+    // A list of months, at most 600 (fifty years): rules cannot loop, so the list is joined with
+    // commas and matched as a whole; the length check stops one element from hiding several.
+    function isPeriodList(v) {
+      return v is list && v.size() <= 600
+        && (v.size() == 0
+            || (v.join(',').size() == v.size() * 8 - 1
+                && v.join(',').matches('^\\d{4}-(0[1-9]|1[0-2])(,\\d{4}-(0[1-9]|1[0-2]))*$')));
+    }
+
+    // Expense fields. An expense posted from a recurring template also carries templateId and
+    // period, always both (rec-<templateId>-<period> ids); ordinary and legacy expenses neither.
+    function validExpenseFields(d) {
       return hasExactly(d, ['date', 'category', 'description', 'amountCents', 'paidBy', 'split',
                             'createdAt', 'updatedAt', 'createdBy', 'deleted'])
+        || (hasExactly(d, ['date', 'category', 'description', 'amountCents', 'paidBy', 'split',
+                           'createdAt', 'updatedAt', 'createdBy', 'deleted', 'templateId', 'period'])
+            && d.templateId is string && d.templateId.size() > 0 && d.templateId.size() <= 64
+            && isPeriod(d.period));
+    }
+
+    function validExpense(d) {
+      return validExpenseFields(d)
         && isDate(d.date)
         && isText(d.category, 100) && d.category.size() > 0
         && isText(d.description, 1000)
@@ -73,6 +97,25 @@ service cloud.firestore {
         && d.from != d.to
         && isAmount(d.amountCents)
         && isText(d.note, 1000)
+        && d.createdAt is timestamp
+        && d.updatedAt is timestamp
+        && isPerson(d.createdBy)
+        && d.deleted is bool;
+    }
+
+    function validRecurring(d) {
+      return hasExactly(d, ['name', 'category', 'description', 'amountCents', 'paidBy', 'split',
+                            'dayOfMonth', 'active', 'skippedPeriods',
+                            'createdAt', 'updatedAt', 'createdBy', 'deleted'])
+        && isText(d.name, 100) && d.name.size() > 0
+        && isText(d.category, 100) && d.category.size() > 0
+        && isText(d.description, 1000)
+        && isAmount(d.amountCents)
+        && isPerson(d.paidBy)
+        && d.split is string && d.split in ['HALF', 'FULL_FOR_OTHER']
+        && d.dayOfMonth is int && d.dayOfMonth >= 1 && d.dayOfMonth <= 31
+        && d.active is bool
+        && isPeriodList(d.skippedPeriods)
         && d.createdAt is timestamp
         && d.updatedAt is timestamp
         && isPerson(d.createdBy)
@@ -106,6 +149,14 @@ service cloud.firestore {
       allow read: if isMember();
       allow create: if isMember() && validSettlement(request.resource.data) && createdByMe();
       allow update: if isMember() && validSettlement(request.resource.data) && keepsAuthorship();
+      allow delete: if false;
+    }
+
+    // Recurring expense templates (rent etc.), posted as expenses from the "Dospjelo" cards.
+    match /recurring/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && validRecurring(request.resource.data) && createdByMe();
+      allow update: if isMember() && validRecurring(request.resource.data) && keepsAuthorship();
       allow delete: if false;
     }
 

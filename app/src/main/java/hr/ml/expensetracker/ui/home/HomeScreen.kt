@@ -72,9 +72,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import hr.ml.expensetracker.R
+import hr.ml.expensetracker.domain.DueItem
 import hr.ml.expensetracker.domain.Expense
 import hr.ml.expensetracker.domain.Money
 import hr.ml.expensetracker.domain.Person
+import hr.ml.expensetracker.domain.RecurringTemplate
 import hr.ml.expensetracker.domain.Settlement
 import hr.ml.expensetracker.domain.SplitType
 import hr.ml.expensetracker.ui.common.CategoryBadge
@@ -121,19 +123,38 @@ fun HomeScreen(
     snackbar: SnackbarHostState,
     scope: CoroutineScope,
     onEditExpense: (id: String) -> Unit,
+    onSaveAsTemplate: (expenseId: String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = koinViewModel(),
+    dueViewModel: DueViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val due by dueViewModel.due.collectAsStateWithLifecycle()
     var pendingDelete by remember { mutableStateOf<HomeRecord?>(null) }
+    val added = stringResource(R.string.due_added)
+    val undo = stringResource(R.string.undo)
+    val skippedFormat = stringResource(R.string.due_skipped)
+    // Resolved here (composable) for the snackbar text of whichever card is skipped.
+    val headlines = due.associate { it.key to dueHeadline(it) }
 
     HomeContent(
         state = state,
         me = person,
+        due = due,
         onSettleUp = viewModel::openSettleUp,
         onSelectMonth = viewModel::selectMonth,
         onEdit = { onEditExpense(it.id) },
         onDelete = { pendingDelete = it },
+        onSaveAsTemplate = { onSaveAsTemplate(it.id) },
+        onPostDue = { item -> if (dueViewModel.post(item)) scope.launch { snackbar.showSnackbar(added) } },
+        onSkipDue = { item ->
+            dueViewModel.skip(item)
+            val message = skippedFormat.format(headlines[item.key].orEmpty())
+            scope.launch {
+                val result = snackbar.showSnackbar(message, actionLabel = undo, duration = SnackbarDuration.Long)
+                if (result == SnackbarResult.ActionPerformed) dueViewModel.undoSkip(item)
+            }
+        },
         modifier = modifier,
     )
 
@@ -157,7 +178,6 @@ fun HomeScreen(
                 is HomeRecord.SettlementItem -> R.string.settlement_deleted
             },
         )
-        val undo = stringResource(R.string.undo)
         DeleteDialog(
             record = record,
             onConfirm = {
@@ -177,10 +197,14 @@ fun HomeScreen(
 private fun HomeContent(
     state: HomeUiState,
     me: Person,
+    due: List<DueItem>,
     onSettleUp: () -> Unit,
     onSelectMonth: (YearMonth?) -> Unit,
     onEdit: (Expense) -> Unit,
     onDelete: (HomeRecord) -> Unit,
+    onSaveAsTemplate: (Expense) -> Unit,
+    onPostDue: (DueItem) -> Unit,
+    onSkipDue: (DueItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -201,6 +225,15 @@ private fun HomeContent(
                 // The balance is global: the month filter and the search narrow the list below only.
                 item(key = "balance") {
                     BalanceCard(state.balanceCents, me, onSettleUp, Modifier.padding(bottom = 8.dp))
+                }
+                // Templates due this month (or overdue), above the month chips; gone once posted.
+                items(due, key = { "due:${it.key}" }, contentType = { "due" }) { item ->
+                    DueCard(
+                        item = item,
+                        onAdd = { onPostDue(item) },
+                        onSkip = { onSkipDue(item) },
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
                 }
                 if (state.months.isNotEmpty()) {
                     item(key = "months") {
@@ -243,6 +276,7 @@ private fun HomeContent(
                                 shape = shape,
                                 onClick = { onEdit(record.expense) },
                                 onDelete = { onDelete(record) },
+                                onSaveAsTemplate = { onSaveAsTemplate(record.expense) },
                             )
                             is HomeRecord.SettlementItem -> SettlementRow(
                                 settlement = record.settlement,
@@ -425,7 +459,7 @@ private fun groupShape(index: Int, count: Int): Shape {
 }
 
 @Composable
-private fun ExpenseRow(expense: Expense, shape: Shape, onClick: () -> Unit, onDelete: () -> Unit) {
+private fun ExpenseRow(expense: Expense, shape: Shape, onClick: () -> Unit, onDelete: () -> Unit, onSaveAsTemplate: () -> Unit) {
     var menuOpen by remember { mutableStateOf(false) }
     ListItem(
         leadingContent = { CategoryBadge(expense.category) },
@@ -458,7 +492,7 @@ private fun ExpenseRow(expense: Expense, shape: Shape, onClick: () -> Unit, onDe
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(Money.format(expense.amountCents), style = MaterialTheme.typography.titleMedium)
-                RowMenu(menuOpen, { menuOpen = it }, onEdit = onClick, onDelete = onDelete)
+                RowMenu(menuOpen, { menuOpen = it }, onEdit = onClick, onDelete = onDelete, onSaveAsTemplate = onSaveAsTemplate)
             }
         },
         colors = ListItemDefaults.colors(containerColor = AppTheme.colors.card),
@@ -510,7 +544,13 @@ private fun SettlementRow(settlement: Settlement, shape: Shape, onDelete: () -> 
 }
 
 @Composable
-private fun RowMenu(expanded: Boolean, onExpandedChange: (Boolean) -> Unit, onEdit: (() -> Unit)?, onDelete: () -> Unit) {
+private fun RowMenu(
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onEdit: (() -> Unit)?,
+    onDelete: () -> Unit,
+    onSaveAsTemplate: (() -> Unit)? = null,
+) {
     Box {
         IconButton(onClick = { onExpandedChange(true) }) {
             Icon(painterResource(R.drawable.ic_more_vert), contentDescription = stringResource(R.string.more_actions))
@@ -522,6 +562,15 @@ private fun RowMenu(expanded: Boolean, onExpandedChange: (Boolean) -> Unit, onEd
                     onClick = {
                         onExpandedChange(false)
                         onEdit()
+                    },
+                )
+            }
+            if (onSaveAsTemplate != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.save_as_template)) },
+                    onClick = {
+                        onExpandedChange(false)
+                        onSaveAsTemplate()
                     },
                 )
             }
@@ -642,10 +691,23 @@ private fun HomeContentPreview() {
                 summary = FilterSummary(expenseCount = 2, totalCents = 5_250, recordCount = 3),
             ),
             me = Person.LOVEL,
+            due = listOf(
+                DueItem(
+                    RecurringTemplate(
+                        "t", "Stanarina", "Stanarina", "", 50_000, Person.MARINA, SplitType.HALF, 15, true, emptySet(),
+                        at, at, Person.MARINA,
+                    ),
+                    YearMonth.of(2026, 10),
+                    overdue = false,
+                ),
+            ),
             onSettleUp = {},
             onSelectMonth = {},
             onEdit = {},
             onDelete = {},
+            onSaveAsTemplate = {},
+            onPostDue = {},
+            onSkipDue = {},
         )
     }
 }

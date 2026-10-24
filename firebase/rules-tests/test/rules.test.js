@@ -90,6 +90,30 @@ function settlement(overrides = {}) {
   };
 }
 
+function template(overrides = {}) {
+  return {
+    name: 'Stanarina',
+    category: 'Stanarina',
+    description: '',
+    amountCents: 50000,
+    paidBy: 'MARINA',
+    split: 'HALF',
+    dayOfMonth: 15,
+    active: true,
+    skippedPeriods: [],
+    createdAt: ts,
+    updatedAt: ts,
+    createdBy: 'LOVEL',
+    deleted: false,
+    ...overrides,
+  };
+}
+
+// An expense posted from template t1 for October 2026 (deterministic id rec-t1-2026-10).
+function posted(overrides = {}) {
+  return expense({ templateId: 't1', period: '2026-10', category: 'Stanarina', amountCents: 50000, ...overrides });
+}
+
 function without(obj, key) {
   const copy = { ...obj };
   delete copy[key];
@@ -266,5 +290,136 @@ describe('config/members', () => {
     await assertFails(deleteDoc(doc(lovel(), 'config/members')));
     await assertFails(setDoc(doc(stranger(), 'config/members'), takeover));
     await assertFails(setDoc(doc(anonymous(), 'config/members'), takeover));
+  });
+});
+
+describe('recurring templates', () => {
+  test('members can create, read, update and soft-delete them', async () => {
+    await assertSucceeds(setDoc(doc(lovel(), 'recurring/t1'), template()));
+    await assertSucceeds(getDoc(doc(marina(), 'recurring/t1')));
+    await assertSucceeds(getDocs(query(collection(marina(), 'recurring'), where('deleted', '==', false))));
+    // The other member may edit (skip a month, pause it); authorship stays with Lovel.
+    await assertSucceeds(setDoc(doc(marina(), 'recurring/t1'), template({ skippedPeriods: ['2026-09', '2026-10'], active: false })));
+    await assertSucceeds(updateDoc(doc(marina(), 'recurring/t1'), { deleted: true, updatedAt: Timestamp.now() }));
+  });
+
+  test('non-members are denied', async () => {
+    await seed('recurring/t1', template());
+    for (const d of [stranger(), anonymous(), db(LOVEL, { verified: false })]) {
+      await assertFails(getDoc(doc(d, 'recurring/t1')));
+      await assertFails(getDocs(collection(d, 'recurring')));
+      await assertFails(setDoc(doc(d, 'recurring/t2'), template()));
+      await assertFails(updateDoc(doc(d, 'recurring/t1'), { active: false }));
+    }
+  });
+
+  test('cannot be hard-deleted', async () => {
+    await seed('recurring/t1', template());
+    await assertFails(deleteDoc(doc(lovel(), 'recurring/t1')));
+  });
+
+  test('createdBy is the writer and authorship never changes', async () => {
+    await assertFails(setDoc(doc(lovel(), 'recurring/t1'), template({ createdBy: 'MARINA' })));
+    await assertSucceeds(setDoc(doc(marina(), 'recurring/t2'), template({ createdBy: 'MARINA' })));
+    await seed('recurring/t3', template({ createdBy: 'LOVEL' }));
+    await assertFails(updateDoc(doc(marina(), 'recurring/t3'), { createdBy: 'MARINA' }));
+    await assertFails(updateDoc(doc(lovel(), 'recurring/t3'), { createdAt: Timestamp.now() }));
+  });
+
+  test('accepts the day range edges and many skipped months', async () => {
+    await assertSucceeds(setDoc(doc(lovel(), 'recurring/a'), template({ dayOfMonth: 1 })));
+    await assertSucceeds(setDoc(doc(lovel(), 'recurring/b'), template({ dayOfMonth: 31 })));
+    const months = Array.from({ length: 36 }, (_, i) => `${2024 + Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, '0')}`);
+    await assertSucceeds(setDoc(doc(lovel(), 'recurring/c'), template({ skippedPeriods: months })));
+    await assertSucceeds(setDoc(doc(lovel(), 'recurring/d'), template({ skippedPeriods: ['2026-12'], name: 'x'.repeat(100), description: 'y'.repeat(1000) })));
+  });
+
+  const badTemplates = {
+    'day 0': template({ dayOfMonth: 0 }),
+    'day 32': template({ dayOfMonth: 32 }),
+    'fractional day': template({ dayOfMonth: 15.5 }),
+    'string day': template({ dayOfMonth: '15' }),
+    'string active': template({ active: 'true' }),
+    'skipped periods not a list': template({ skippedPeriods: '2026-10' }),
+    'short period': template({ skippedPeriods: ['2026-1'] }),
+    'month 13': template({ skippedPeriods: ['2026-13'] }),
+    'month 00': template({ skippedPeriods: ['2026-00'] }),
+    'period with a day': template({ skippedPeriods: ['2026-10-01'] }),
+    'two periods in one element': template({ skippedPeriods: ['2026-09,2026-10'] }),
+    'a good and a bad period': template({ skippedPeriods: ['2026-09', 'rujan'] }),
+    'numeric period': template({ skippedPeriods: [202610] }),
+    'empty name': template({ name: '' }),
+    'long name': template({ name: 'x'.repeat(101) }),
+    'long description': template({ description: 'y'.repeat(1001) }),
+    'empty category': template({ category: '' }),
+    'zero amount': template({ amountCents: 0 }),
+    'fractional amount': template({ amountCents: 500.5 }),
+    'unknown payer': template({ paidBy: 'ANA' }),
+    'unknown split': template({ split: 'THIRDS' }),
+    'string deleted': template({ deleted: 'false' }),
+    'unknown field': template({ frequency: 'MONTHLY' }),
+    'missing field': without(template(), 'skippedPeriods'),
+    'missing day': without(template(), 'dayOfMonth'),
+  };
+
+  for (const [name, data] of Object.entries(badTemplates)) {
+    test(`template rejected: ${name}`, async () => {
+      await assertFails(setDoc(doc(lovel(), 'recurring/bad'), data));
+    });
+  }
+
+  test('updates are validated too', async () => {
+    await seed('recurring/t1', template());
+    await assertFails(updateDoc(doc(lovel(), 'recurring/t1'), { dayOfMonth: 40 }));
+    await assertFails(updateDoc(doc(lovel(), 'recurring/t1'), { skippedPeriods: ['10-2026'] }));
+    await assertFails(updateDoc(doc(lovel(), 'recurring/t1'), { active: 1 }));
+    await assertSucceeds(updateDoc(doc(lovel(), 'recurring/t1'), { skippedPeriods: ['2026-10'], updatedAt: Timestamp.now() }));
+  });
+});
+
+describe('expenses posted from a template', () => {
+  test('are accepted with templateId and period', async () => {
+    await assertSucceeds(setDoc(doc(lovel(), 'expenses/rec-t1-2026-10'), posted()));
+    await assertSucceeds(getDoc(doc(marina(), 'expenses/rec-t1-2026-10')));
+    // Editing and soft-deleting keep working.
+    await assertSucceeds(setDoc(doc(marina(), 'expenses/rec-t1-2026-10'), posted({ amountCents: 52000 })));
+    await assertSucceeds(updateDoc(doc(marina(), 'expenses/rec-t1-2026-10'), { deleted: true, updatedAt: Timestamp.now() }));
+    await assertSucceeds(setDoc(doc(lovel(), 'expenses/rec-t1-2026-11'), posted({ templateId: 'x'.repeat(64), period: '2026-11' })));
+  });
+
+  test('the second phone posting the same month cannot take over authorship', async () => {
+    await assertSucceeds(setDoc(doc(lovel(), 'expenses/rec-t1-2026-10'), posted({ createdBy: 'LOVEL' })));
+    const later = Timestamp.fromDate(new Date('2026-10-24T09:00:00Z'));
+    await assertFails(setDoc(doc(marina(), 'expenses/rec-t1-2026-10'), posted({ createdBy: 'MARINA', createdAt: later, updatedAt: later })));
+    // Re-posting with the stored authorship (what the app does) is fine.
+    await assertSucceeds(setDoc(doc(marina(), 'expenses/rec-t1-2026-10'), posted({ createdBy: 'LOVEL', updatedAt: later })));
+  });
+
+  const badPosted = {
+    'templateId without period': without(posted(), 'period'),
+    'period without templateId': without(posted(), 'templateId'),
+    'short period': posted({ period: '2026-1' }),
+    'month 13': posted({ period: '2026-13' }),
+    'period with a day': posted({ period: '2026-10-15' }),
+    'Croatian period': posted({ period: '10/2026' }),
+    'numeric period': posted({ period: 202610 }),
+    'empty templateId': posted({ templateId: '' }),
+    'long templateId': posted({ templateId: 'x'.repeat(65) }),
+    'numeric templateId': posted({ templateId: 1 }),
+    'null templateId': posted({ templateId: null, period: null }),
+    'extra field besides the pair': posted({ dayOfMonth: 15 }),
+  };
+
+  for (const [name, data] of Object.entries(badPosted)) {
+    test(`posted expense rejected: ${name}`, async () => {
+      await assertFails(setDoc(doc(lovel(), 'expenses/bad'), data));
+    });
+  }
+
+  test('an existing expense cannot gain half of the pair', async () => {
+    await seed('expenses/e1', expense());
+    await assertFails(updateDoc(doc(lovel(), 'expenses/e1'), { templateId: 't1' }));
+    await assertFails(updateDoc(doc(lovel(), 'expenses/e1'), { period: '2026-10' }));
+    await assertSucceeds(updateDoc(doc(lovel(), 'expenses/e1'), { templateId: 't1', period: '2026-10' }));
   });
 });

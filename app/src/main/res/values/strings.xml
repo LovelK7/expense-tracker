@@ -281,4 +281,38 @@
     <!-- "Hrana · prosjek 31,20 €" -->
     <string name="habits_top_detail">%1$s · prosjek %2$s</string>
     <string name="habits_top_empty">Troškovi u razdoblju nemaju opis.</string>
+
+    <!-- Recurring templates (Stage 10) -->
+    <string name="category_change">Promijeni kategoriju</string>
+    <string name="templates_title">Predlošci</string>
+    <string name="templates_edit">Uredi predloške</string>
+    <!-- Template chip on the add form: "Stanarina · 500,00 €" -->
+    <string name="template_chip">%1$s · %2$s</string>
+    <string name="templates_empty">Nema predložaka. Dodaj redoviti trošak, npr. stanarinu, pa ga svaki mjesec unesi jednim dodirom.</string>
+    <string name="template_new">Novi predložak</string>
+    <string name="template_edit_title">Uredi predložak</string>
+    <string name="template_name_label">Naziv</string>
+    <string name="template_day_label">Dan u mjesecu</string>
+    <string name="template_day_hint">1–31; u kraćim mjesecima zadnji dan u mjesecu</string>
+    <string name="template_active_label">Aktivan</string>
+    <string name="template_active_hint">Neaktivan predložak ne prikazuje se kao dospio.</string>
+    <string name="template_saved">Predložak spremljen</string>
+    <string name="template_deleted">Predložak obrisan</string>
+    <string name="delete_template_title">Obrisati predložak?</string>
+    <!-- Template list row: "500,00 € · 15. u mjesecu" -->
+    <string name="template_row_meta">%1$s · %2$d. u mjesecu</string>
+    <string name="template_inactive">Neaktivan</string>
+    <string name="save_as_template">Spremi kao predložak</string>
+    <!-- Due cards on Početna -->
+    <string name="due_title">Dospjelo</string>
+    <string name="due_overdue">Zaostalo</string>
+    <!-- "Stanarina · listopad 2026." -->
+    <string name="due_headline">%1$s · %2$s</string>
+    <!-- "Dospijeće 15. listopada 2026." -->
+    <string name="due_date">Dospijeće %1$s</string>
+    <string name="due_add">Dodaj</string>
+    <string name="due_skip">Preskoči</string>
+    <string name="due_added">Trošak dodan</string>
+    <!-- "Preskočeno: Stanarina · listopad 2026." -->
+    <string name="due_skipped">Preskočeno: %1$s</string>
 </resources>

@@ -7,18 +7,22 @@ import hr.ml.expensetracker.domain.Expense
 import hr.ml.expensetracker.domain.ExpenseRepository
 import hr.ml.expensetracker.domain.Money
 import hr.ml.expensetracker.domain.Person
+import hr.ml.expensetracker.domain.RecurringRepository
+import hr.ml.expensetracker.domain.RecurringTemplate
 import hr.ml.expensetracker.domain.SplitType
 import hr.ml.expensetracker.session.CurrentPerson
 import hr.ml.expensetracker.ui.common.acceptAmountInput
 import java.time.Clock
 import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -41,6 +45,11 @@ data class ExpenseFormState(
     val loaded: Boolean = true,
     /** Editing only: the expense no longer exists (deleted meanwhile). */
     val missing: Boolean = false,
+    /**
+     * Whether the category grid is open. Collapsed (only the selected chip) once a category is
+     * chosen, so the description and the save button stay on screen; an empty form starts open.
+     */
+    val categoriesExpanded: Boolean = true,
 ) {
     val amountCents: Long? get() = Money.parseCents(amountText)
 
@@ -52,9 +61,12 @@ data class ExpenseFormState(
  * the expense with `createdBy` = the signed-in person, or updates it keeping its id, `createdBy`
  * and `createdAt`. The category chips are ordered by how often each category has been used,
  * live from [expenses] (the static [Categories.FOR_PICKER] until the expenses are loaded).
+ * [templates] (the "Predlošci" chips) prefill a new expense ([applyTemplate]); it is saved as an
+ * ordinary expense, without a template reference.
  */
 class ExpenseFormViewModel(
     private val expenses: ExpenseRepository,
+    recurring: RecurringRepository,
     private val currentPerson: CurrentPerson,
     private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
@@ -64,6 +76,12 @@ class ExpenseFormViewModel(
     private var pickerOrder: List<String> = Categories.FOR_PICKER
     private val _state = MutableStateFlow(blank())
     val state: StateFlow<ExpenseFormState> = _state.asStateFlow()
+
+    /** The active templates, by name: the "Predlošci" chips above the add form. */
+    val templates: StateFlow<List<RecurringTemplate>> = recurring.observeAll()
+        .map { all -> all.filter { it.active } }
+        .catch { emit(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     init {
         viewModelScope.launch {
@@ -109,9 +127,27 @@ class ExpenseFormViewModel(
                     date = expense.date,
                     categories = pickerFor(expense.category),
                     loaded = true,
+                    categoriesExpanded = false,
                 )
             }
         }
+    }
+
+    /**
+     * Fills the new-expense form from [template]: amount, category, description, payer and
+     * split, dated today. Saving it is an ordinary new expense.
+     */
+    fun applyTemplate(template: RecurringTemplate) {
+        editing = null
+        _state.value = blank().copy(
+            amountText = Money.formatInput(template.amountCents),
+            category = template.category,
+            description = template.description.take(MAX_DESCRIPTION),
+            paidBy = template.paidBy,
+            split = template.split,
+            categories = pickerFor(template.category),
+            categoriesExpanded = false,
+        )
     }
 
     /** Called when the add form is shown: an untouched form picks up a new "today" after midnight. */
@@ -130,7 +166,11 @@ class ExpenseFormViewModel(
         _state.update { it.copy(amountText = accepted) }
     }
 
-    fun onCategorySelect(category: String) = _state.update { it.copy(category = category) }
+    /** Selecting a category also collapses the grid to the chosen chip. */
+    fun onCategorySelect(category: String) = _state.update { it.copy(category = category, categoriesExpanded = false) }
+
+    /** Opens the full category grid again (tap on the collapsed chip). */
+    fun expandCategories() = _state.update { it.copy(categoriesExpanded = true) }
 
     fun onDescriptionChange(text: String) = _state.update { it.copy(description = text.take(MAX_DESCRIPTION)) }
 

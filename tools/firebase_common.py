@@ -188,6 +188,10 @@ PERSONS = ("LOVEL", "MARINA")
 SPLITS = ("HALF", "FULL_FOR_OTHER")
 EXPENSE_FIELDS = ("date", "category", "description", "amountCents", "paidBy", "split",
                   "createdAt", "updatedAt", "createdBy", "deleted")
+# Optional pair on expenses posted from a recurring template (Stage 10): both or neither. Legacy
+# rows never have them.
+EXPENSE_TEMPLATE_FIELDS = ("templateId", "period")
+_PERIOD = re.compile(r"\d{4}-(0[1-9]|1[0-2])")
 SETTLEMENT_FIELDS = ("date", "from", "to", "amountCents", "note",
                      "createdAt", "updatedAt", "createdBy", "deleted")
 
@@ -359,9 +363,18 @@ def expense_rule_violations(doc: dict) -> list[str]:
     such a document. The app can still read it, but cannot edit or soft-delete it, because every
     client update is validated again.
     """
-    if set(doc) != set(EXPENSE_FIELDS):
-        return [f"field set {sorted(doc)} != {sorted(EXPENSE_FIELDS)}"]
+    fields = set(doc)
+    with_template = set(EXPENSE_FIELDS) | set(EXPENSE_TEMPLATE_FIELDS)
+    if fields != set(EXPENSE_FIELDS) and fields != with_template:
+        return [f"field set {sorted(doc)} != {sorted(EXPENSE_FIELDS)} (optionally with both of "
+                f"{', '.join(EXPENSE_TEMPLATE_FIELDS)})"]
     problems = []
+    if fields == with_template:
+        template_id = doc["templateId"]
+        if not (isinstance(template_id, str) and 0 < len(template_id) <= 64):
+            problems.append("templateId must be a string of 1..64 characters")
+        if not (isinstance(doc["period"], str) and _PERIOD.fullmatch(doc["period"])):
+            problems.append("period is not a yyyy-MM string")
     if not (isinstance(doc["date"], str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", doc["date"])):
         problems.append("date is not a yyyy-MM-dd string")
     if not (isinstance(doc["category"], str) and 0 < len(doc["category"]) <= 100):

@@ -42,6 +42,14 @@ Expense(
 
 Settlement(id, date: LocalDate, from: Person, to: Person, amountCents: Long, note: String,
            createdAt, updatedAt, createdBy, deleted)
+
+// Stage 10
+Expense(..., templateId: String? = null, period: String? = null)   // both or neither, "yyyy-MM"
+
+RecurringTemplate(id, name, category, description, amountCents, paidBy, split,
+                  dayOfMonth: Int /* 1..31 */, active: Boolean,
+                  skippedPeriods: Set<String /* "yyyy-MM" */>,
+                  createdAt, updatedAt, createdBy, deleted)
 ```
 
 Categories are a controlled list (seeded from the sheet's "Kategorije" tab plus every category
@@ -197,6 +205,31 @@ validated six-hue order, so a year keeps its colour; "Tko plaća" uses a validat
 for Lovel/Marina. The heatmap uses a one-hue teal ramp of five steps (light: light to dark; dark
 theme: dim to bright), validated as an ordinal ramp, with a neutral cell for days without spending.
 
+## Recurring templates (Stage 10)
+
+Monthly only. `RecurringSchedule` in `:domain` (pure, tested) decides what is due:
+
+- For `today` a template is due for a period P (a calendar month) when its due date
+  `P.atDay(min(dayOfMonth, P.lengthOfMonth()))` is not after `today` (31 → 28/29 February, 30
+  April), P is not in `skippedPeriods`, and no non-deleted expense has `templateId == id &&
+  period == P`. Only the current month and the previous one (overdue, "Zaostalo") are
+  considered. Inactive and deleted templates are never due.
+- Decision (Stage 10): a template is never due for a month before the month it was created in
+  (in the device time zone). Without it, every new template would immediately show last month
+  as overdue although that rent was usually entered by hand already.
+- Posting ("Dodaj" on a Dospjelo card) writes the template's fields on the due date with
+  `createdBy` = the signed-in person, `templateId` and `period`, under the deterministic id
+  `rec-<templateId>-<yyyy-MM>`. Both phones posting the same month produce the same document.
+  `ExpenseRepository.addOrRestore` reads the document first (server, or the cache offline) and,
+  if it exists (posted meanwhile, or posted and then deleted), keeps its stored `createdBy` and
+  `createdAt`, which the rules never let change; a concurrent second write that still carries
+  other authorship is rejected by the rules and rolled back harmlessly.
+- "Preskoči" adds P to `skippedPeriods` (undo removes it again, applied to the newest stored
+  version of the template).
+- A template chip on the Dodaj tab only prefills the form (dated today); that expense is an
+  ordinary one without `templateId`. Statistics and the export treat posted expenses like any
+  other expense.
+
 ## Screens (MVP)
 
 1. **Dodaj trošak** (add expense): amount, category chips, optional description, payer toggle
@@ -219,8 +252,18 @@ theme: dim to bright), validated as an ordinal ramp, with a neutral cell for day
    pays) | Navike (tiles, frequency, weekdays, day of month, calendar heatmap, amount histogram,
    category mix per quarter, most frequent descriptions), with their own range 12 mj | 24 mj | Sve.
    Početna's rows keep the description and the payer line to one line each (ellipsis).
+4. **Predlošci** (Stage 10; full screen over the tabs like the expense editor, opened from the top
+   bar's repeat icon, "Uredi predloške" on the Dodaj tab, or "Spremi kao predložak" in an
+   expense's menu): templates with an active switch; add/edit form (name, category chips in the
+   usage order, description, amount, payer, split, day of month 1–31, active); soft delete with
+   confirmation and undo. Početna shows a "Dospjelo" card per due item above the month chips;
+   the Dodaj tab shows a "Predlošci" chip row above the amount (hidden without templates).
+   On the add, edit and template forms the category grid collapses to the selected chip once a
+   category is chosen (tap it to reopen the grid); an empty new form starts with the grid open,
+   a prefilled one (edit, template, "Spremi kao predložak") collapsed. The state lives in the
+   ViewModel.
 
-Deferred (v2 backlog): recurring rent template, home-screen quick-add widget, receipt photos,
+Deferred (v2 backlog): home-screen quick-add widget, receipt photos,
 budgets, custom split ratios, push notifications, web dashboard.
 
 ## Architecture
@@ -241,6 +284,15 @@ budgets, custom split ratios, push notifications, web dashboard.
 - `expenses/{id}`, `settlements/{id}`: client-generated ids = document ids; fields mirror the
   domain models (`date` as `yyyy-MM-dd` string, `amountCents` integer, Firestore timestamps,
   enum names as strings, `deleted` boolean). No hard deletes.
+- Stage 10: `recurring/{id}` (template fields as in the model, `dayOfMonth` integer,
+  `skippedPeriods` a sorted list of `yyyy-MM` strings). Expenses may carry `templateId`
+  (string, 1–64 characters) and `period` (`yyyy-MM`, month 01–12), only together; the rules'
+  field check accepts exactly the ten base fields or the ten plus both. `recurring` has the same
+  member-only access, strict validation (name 1–100, description ≤ 1000, `dayOfMonth` int
+  1–31, `active` bool, every skipped period `yyyy-MM`, at most 600), immutable
+  `createdBy`/`createdAt` and no hard delete. Rules cannot loop over a list, so
+  `skippedPeriods` is joined with commas, matched as a whole and its length checked against the
+  element count. `tools/firebase_common.py` mirrors the expense check.
 - `firestore.rules`: members only (verified token email in `config/members.emails`); strict field
   validation; `createdBy` = writer's person on create; `createdBy`/`createdAt` immutable on update.
 

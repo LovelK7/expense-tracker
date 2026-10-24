@@ -31,6 +31,8 @@ class LegacyCsvParserTest {
         assertEquals(Person.LOVEL, first.createdBy)
         assertEquals(Instant.parse("2023-01-02T00:00:00Z"), first.createdAt)
         assertEquals(false, first.deleted)
+        // Legacy rows were never posted from a recurring template.
+        assertEquals(listOf(null), rows.map { it.templateId to it.period }.map { (t, p) -> t ?: p }.distinct())
     }
 
     @Test

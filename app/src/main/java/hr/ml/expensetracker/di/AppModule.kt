@@ -6,9 +6,11 @@ import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.PersistentCacheSettings
 import hr.ml.expensetracker.R
 import hr.ml.expensetracker.data.FirestoreExpenseRepository
+import hr.ml.expensetracker.data.FirestoreRecurringRepository
 import hr.ml.expensetracker.data.FirestoreSettlementRepository
 import hr.ml.expensetracker.dev.DevEnvironment
 import hr.ml.expensetracker.domain.ExpenseRepository
+import hr.ml.expensetracker.domain.RecurringRepository
 import hr.ml.expensetracker.domain.SettlementRepository
 import hr.ml.expensetracker.session.AuthGateway
 import hr.ml.expensetracker.session.CurrentPerson
@@ -18,7 +20,9 @@ import hr.ml.expensetracker.session.GoogleSignIn
 import hr.ml.expensetracker.session.MembersSource
 import hr.ml.expensetracker.session.SessionRepository
 import hr.ml.expensetracker.ui.expense.ExpenseFormViewModel
+import hr.ml.expensetracker.ui.home.DueViewModel
 import hr.ml.expensetracker.ui.home.HomeViewModel
+import hr.ml.expensetracker.ui.recurring.TemplatesViewModel
 import hr.ml.expensetracker.ui.session.SessionViewModel
 import hr.ml.expensetracker.ui.stats.StatisticsViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -59,9 +63,12 @@ val appModule = module {
 
     single<ExpenseRepository> { FirestoreExpenseRepository(get()) }
     single<SettlementRepository> { FirestoreSettlementRepository(get()) }
+    single<RecurringRepository> { FirestoreRecurringRepository(get()) }
 
     viewModel { SessionViewModel(get(), get()) }
     viewModel { HomeViewModel(get(), get(), get()) }
-    viewModel { ExpenseFormViewModel(get(), get()) }
+    viewModel { ExpenseFormViewModel(get(), get(), get()) }
+    viewModel { DueViewModel(get(), get(), get()) }
+    viewModel { TemplatesViewModel(get(), get(), get()) }
     viewModel { StatisticsViewModel(get()) }
 }

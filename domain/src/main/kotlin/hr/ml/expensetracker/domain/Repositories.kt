@@ -20,6 +20,14 @@ interface ExpenseRepository {
     /** Replaces an existing expense. [Expense.createdBy] and [Expense.createdAt] must not change. */
     fun update(expense: Expense)
 
+    /**
+     * Stores an expense under a deterministic id (a posted [RecurringTemplate],
+     * [RecurringSchedule.expenseId]). When a document with that id already exists (posted and
+     * deleted before, or posted meanwhile on the other phone) it is overwritten but keeps its
+     * stored `createdBy` and `createdAt`, which the security rules never let change.
+     */
+    fun addOrRestore(expense: Expense) = add(expense)
+
     /** Marks the expense deleted and bumps its `updatedAt`. */
     fun softDelete(id: String)
 }
@@ -35,5 +43,24 @@ interface SettlementRepository {
 
     fun update(settlement: Settlement)
 
+    fun softDelete(id: String)
+}
+
+/**
+ * Storage for [RecurringTemplate] records; same offline-first contract as [ExpenseRepository]
+ * (Firestore collection `recurring`).
+ */
+interface RecurringRepository {
+    /** Every non-deleted template, by name. */
+    fun observeAll(): Flow<List<RecurringTemplate>>
+
+    fun newId(): String
+
+    fun add(template: RecurringTemplate)
+
+    /** Replaces an existing template. [RecurringTemplate.createdBy] and `createdAt` must not change. */
+    fun update(template: RecurringTemplate)
+
+    /** Marks the template deleted and bumps its `updatedAt`. */
     fun softDelete(id: String)
 }

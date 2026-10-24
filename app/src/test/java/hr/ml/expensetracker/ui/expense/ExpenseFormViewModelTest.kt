@@ -4,9 +4,11 @@ import hr.ml.expensetracker.domain.Categories
 import hr.ml.expensetracker.domain.Expense
 import hr.ml.expensetracker.domain.ExpenseRepository
 import hr.ml.expensetracker.domain.Person
+import hr.ml.expensetracker.domain.RecurringTemplate
 import hr.ml.expensetracker.domain.SplitType
 import hr.ml.expensetracker.session.CurrentPerson
 import hr.ml.expensetracker.testing.InMemoryExpenseRepository
+import hr.ml.expensetracker.testing.InMemoryRecurringRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -15,6 +17,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -32,9 +36,10 @@ class ExpenseFormViewModelTest {
     private val clock = Clock.fixed(now, ZoneId.of("Europe/Zagreb"))
     private val today = LocalDate.of(2026, 10, 24)
     private val repo = InMemoryExpenseRepository(clock = clock::instant)
+    private val recurring = InMemoryRecurringRepository(clock = clock::instant)
 
     private fun viewModel(person: Person? = Person.MARINA) =
-        ExpenseFormViewModel(repo, CurrentPerson { person }, clock)
+        ExpenseFormViewModel(repo, recurring, CurrentPerson { person }, clock)
 
     private val stored get() = repo.records.value.values.toList()
 
@@ -206,7 +211,7 @@ class ExpenseFormViewModelTest {
         val failing = object : ExpenseRepository by repo {
             override fun observeAll(): Flow<List<Expense>> = flow { throw IllegalStateException("offline") }
         }
-        val vm = ExpenseFormViewModel(failing, CurrentPerson { Person.LOVEL }, clock)
+        val vm = ExpenseFormViewModel(failing, recurring, CurrentPerson { Person.LOVEL }, clock)
         assertEquals(Categories.FOR_PICKER, vm.state.value.categories)
     }
 
@@ -246,5 +251,104 @@ class ExpenseFormViewModelTest {
         vm.startEdit("nope")
         assertTrue(vm.state.value.missing)
         assertFalse(vm.state.value.canSave)
+    }
+
+    // --- Stage 10: collapsing category grid, template chips -------------------------------------
+
+    @Test
+    fun theCategoryGridCollapsesAfterASelection() {
+        val vm = viewModel()
+        assertTrue(vm.state.value.categoriesExpanded) // a new expense starts with the grid open
+        vm.onCategorySelect("Hrana")
+        assertFalse(vm.state.value.categoriesExpanded)
+        vm.expandCategories()
+        assertTrue(vm.state.value.categoriesExpanded)
+        assertEquals("Hrana", vm.state.value.category) // expanding keeps the selection
+        vm.onCategorySelect("Režije")
+        assertFalse(vm.state.value.categoriesExpanded)
+        assertEquals("Režije", vm.state.value.category)
+    }
+
+    @Test
+    fun theGridIsOpenAgainOnTheNextBlankForm() {
+        val vm = viewModel()
+        vm.onAmountChange("5")
+        vm.onCategorySelect("Hrana")
+        assertTrue(vm.save())
+        assertNull(vm.state.value.category)
+        assertTrue(vm.state.value.categoriesExpanded)
+    }
+
+    @Test
+    fun editingOpensWithTheGridCollapsed() {
+        val at = Instant.parse("2026-10-01T10:00:00Z")
+        repo.add(Expense("e1", today, "Hrana", "", 100, Person.LOVEL, SplitType.HALF, at, at, Person.LOVEL))
+        val vm = viewModel()
+        vm.startEdit("e1")
+        assertTrue(vm.state.value.loaded)
+        assertFalse(vm.state.value.categoriesExpanded)
+        vm.reset()
+        assertTrue(vm.state.value.categoriesExpanded)
+    }
+
+    private fun template(id: String, active: Boolean = true, category: String = "Stanarina") = RecurringTemplate(
+        id = id,
+        name = "Stanarina $id",
+        category = category,
+        description = "Najam",
+        amountCents = 50_000,
+        paidBy = Person.LOVEL,
+        split = SplitType.FULL_FOR_OTHER,
+        dayOfMonth = 15,
+        active = active,
+        skippedPeriods = emptySet(),
+        createdAt = now,
+        updatedAt = now,
+        createdBy = Person.LOVEL,
+    )
+
+    @Test
+    fun onlyActiveTemplatesAreOffered() = runTest {
+        recurring.add(template("a"))
+        recurring.add(template("b", active = false))
+        val vm = viewModel()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.templates.collect {} }
+        assertEquals(listOf("a"), vm.templates.value.map { it.id })
+        recurring.add(template("c"))
+        assertEquals(listOf("a", "c"), vm.templates.value.map { it.id })
+    }
+
+    @Test
+    fun aTemplatePrefillsAnOrdinaryExpense() {
+        val vm = viewModel(Person.MARINA)
+        vm.onDateChange(today.minusDays(3))
+        vm.applyTemplate(template("a"))
+        val s = vm.state.value
+        assertEquals("500,00", s.amountText)
+        assertEquals("Stanarina", s.category)
+        assertEquals("Najam", s.description)
+        assertEquals(Person.LOVEL, s.paidBy)
+        assertEquals(SplitType.FULL_FOR_OTHER, s.split)
+        assertEquals(today, s.date)
+        assertFalse(s.categoriesExpanded)
+        assertTrue(s.canSave)
+
+        assertTrue(vm.save())
+        val e = stored.single()
+        assertEquals(50_000L, e.amountCents)
+        assertEquals(today, e.date)
+        assertEquals(Person.MARINA, e.createdBy)
+        // A manual save is a normal expense: no template reference, a fresh id.
+        assertNull(e.templateId)
+        assertNull(e.period)
+        assertEquals("expense-1", e.id)
+    }
+
+    @Test
+    fun aTemplateWithALegacyCategoryKeepsItSelectable() {
+        val vm = viewModel()
+        vm.applyTemplate(template("a", category = "Prijenos"))
+        assertEquals("Prijenos", vm.state.value.categories.first())
+        assertEquals("Prijenos", vm.state.value.category)
     }
 }
