@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only: sign-in shortcuts for the Firebase Auth emulator (dev/DevEnvironment.kt). -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="hr">
+    <string name="dev_sign_in_lovel">Dev: prijava kao Lovel</string>
+    <string name="dev_sign_in_marina">Dev: prijava kao Marina</string>
+</resources>

@@ -31,6 +31,24 @@ object Categories {
         "Zdravlje",
     )
 
+    /** The most used legacy categories, most used first; the add form shows them before the rest. */
+    val MOST_USED: List<String> = listOf(
+        "Hrana",
+        "Prijevoz",
+        "Hrana van",
+        "Režije",
+        "Potrepštine",
+        "Putovanja",
+        "MPO",
+        "Adaptacija",
+    )
+
+    /** Legacy-only: transfers are recorded as settlements from now on, so new expenses skip it. */
+    const val LEGACY_TRANSFER = "Prijenos"
+
+    /** Categories offered for a new expense: [MOST_USED] first, then the rest in list order. */
+    val FOR_PICKER: List<String> = MOST_USED + (DEFAULT - MOST_USED.toSet() - LEGACY_TRANSFER)
+
     /** Legacy names that map onto a different canonical name. Keys are matched case-insensitively. */
     val DEFAULT_ALIASES: Map<String, String> = mapOf("Odjeća" to "Odjeća i oprema")
 }

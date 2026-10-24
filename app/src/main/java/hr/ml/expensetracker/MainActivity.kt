@@ -4,34 +4,17 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.annotation.DrawableRes
-import androidx.annotation.StringRes
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import hr.ml.expensetracker.domain.Person
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import hr.ml.expensetracker.dev.DevEnvironment
+import hr.ml.expensetracker.session.GoogleIdTokenResult
 import hr.ml.expensetracker.session.GoogleSignIn
 import hr.ml.expensetracker.session.SessionState
-import hr.ml.expensetracker.ui.home.HomeScreen
+import hr.ml.expensetracker.ui.AppShell
 import hr.ml.expensetracker.ui.session.LoadingScreen
 import hr.ml.expensetracker.ui.session.NoAccessScreen
 import hr.ml.expensetracker.ui.session.SessionErrorScreen
@@ -64,67 +47,16 @@ private fun AppRoot(viewModel: SessionViewModel = koinViewModel(), googleSignIn:
             signingIn = state.signingIn,
             error = state.signInError,
             onSignIn = { viewModel.signIn { googleSignIn.requestIdToken(activityContext) } },
+            // Empty except in debug builds pointed at the Firebase emulators.
+            devAccounts = DevEnvironment.accounts,
+            onDevSignIn = { account -> viewModel.signIn { GoogleIdTokenResult.Success(account.idToken) } },
         )
         is SessionState.NoAccess -> NoAccessScreen(session.email, onSignOut = viewModel::signOut)
         SessionState.Error -> SessionErrorScreen(onRetry = viewModel::retry, onSignOut = viewModel::signOut)
-        is SessionState.Member -> AppShell(session.person, onSignOut = viewModel::signOut)
-    }
-}
-
-private enum class Destination(@param:StringRes val label: Int, @param:DrawableRes val icon: Int) {
-    HOME(R.string.nav_home, R.drawable.ic_home),
-    ADD(R.string.nav_add, R.drawable.ic_add),
-    STATS(R.string.nav_stats, R.drawable.ic_bar_chart),
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun AppShell(person: Person, onSignOut: () -> Unit) {
-    var current by rememberSaveable { mutableStateOf(Destination.HOME) }
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.app_name)) },
-                actions = {
-                    Text(
-                        stringResource(
-                            when (person) {
-                                Person.LOVEL -> R.string.person_lovel
-                                Person.MARINA -> R.string.person_marina
-                            },
-                        ),
-                    )
-                    IconButton(onClick = onSignOut) {
-                        Icon(painterResource(R.drawable.ic_logout), contentDescription = stringResource(R.string.sign_out))
-                    }
-                },
-            )
-        },
-        bottomBar = {
-            NavigationBar {
-                Destination.entries.forEach { dest ->
-                    NavigationBarItem(
-                        selected = dest == current,
-                        onClick = { current = dest },
-                        icon = { Icon(painterResource(dest.icon), contentDescription = null) },
-                        label = { Text(stringResource(dest.label)) },
-                    )
-                }
+        is SessionState.Member ->
+            // Member screens' ViewModels live only as long as this member's session.
+            CompositionLocalProvider(LocalViewModelStoreOwner provides viewModel.memberViewModels) {
+                AppShell(session.person, onSignOut = viewModel::signOut)
             }
-        },
-    ) { padding ->
-        val modifier = Modifier.padding(padding)
-        when (current) {
-            Destination.HOME -> HomeScreen(modifier)
-            Destination.ADD -> Placeholder(R.string.add_placeholder, modifier)
-            Destination.STATS -> Placeholder(R.string.stats_placeholder, modifier)
-        }
-    }
-}
-
-@Composable
-private fun Placeholder(@StringRes text: Int, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(stringResource(text))
     }
 }

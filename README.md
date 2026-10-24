@@ -74,6 +74,40 @@ python tools/deploy_rules.py             # publish firestore.rules (Firebase Rul
 to run against a project other than the key's. Seed the members first: until `config/members`
 exists the rules deny everyone, including the two members.
 
+### Local development with the Firebase emulators
+
+Google sign-in cannot work on an Android emulator without a real account, so debug builds can
+run against the local Firebase emulator suite (Auth on port 9099, Firestore on 8080, see
+[`firebase.json`](firebase.json)) and sign in with two placeholder accounts. Needs Node 20+,
+Java 21 and the `firebase` CLI (`npx firebase-tools@15.33.0` works, or the copy installed in
+`firebase/rules-tests` by `npm ci`).
+
+1. Start the emulators from the repo root with the rules loaded. Use the project id the app's
+   `google-services.json` names (`troskovi-ml`): the emulators run in single-project mode.
+   ```sh
+   firebase emulators:start --only auth,firestore --project troskovi-ml
+   ```
+   Nothing reaches the real project; the emulator data is gone when they stop.
+2. Seed the allow-list with the dev accounts (`lovel.dev@example.com`,
+   `marina.dev@example.com`); no service account needed:
+   ```sh
+   python tools/seed_members.py --emulator     # FIRESTORE_EMULATOR_HOST, default 127.0.0.1:8080
+   ```
+3. Build and install a debug APK with the flag (or put `useFirebaseEmulators=true` in
+   `local.properties`):
+   ```sh
+   ./gradlew :app:installDebug -PuseFirebaseEmulators=true
+   ```
+   The app then talks to `10.0.2.2` (the host as seen from the Android emulator). When switching
+   an installed app between the emulators and the real project, clear its data first
+   (`adb shell pm clear hr.ml.expensetracker`): the offline cache would mix the two.
+4. On the sign-in screen tap **Dev: prijava kao Lovel** or **Dev: prijava kao Marina**. They sign
+   in through the Auth emulator with an unsigned fake Google ID token.
+
+The flag only exists for the `debug` build type: the emulator hosts, the dev buttons and the
+cleartext-traffic exception live in `app/src/debug/`; release builds use the no-op
+`app/src/release/.../DevEnvironment.kt`.
+
 ### Rules tests
 
 Needs Node 20+ and Java 21 (the Firestore emulator). No Firebase login: the tests run against the

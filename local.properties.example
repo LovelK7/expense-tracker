@@ -3,3 +3,7 @@
 # macOS:   sdk.dir=/Users/<you>/Library/Android/sdk
 # Linux:   sdk.dir=/home/<you>/Android/Sdk
 sdk.dir=/path/to/Android/Sdk
+
+# Debug builds only: use the local Firebase emulators and show the "Dev: prijava kao ..." buttons
+# (README, "Local development with the Firebase emulators"). Default false.
+#useFirebaseEmulators=true

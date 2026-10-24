@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hr.ml.expensetracker.R
+import hr.ml.expensetracker.dev.DevAccount
 import hr.ml.expensetracker.ui.theme.TroskoviTheme
 
 @Composable
@@ -45,7 +46,13 @@ fun LoadingScreen() {
 }
 
 @Composable
-fun SignInScreen(signingIn: Boolean, error: SignInError?, onSignIn: () -> Unit) {
+fun SignInScreen(
+    signingIn: Boolean,
+    error: SignInError?,
+    onSignIn: () -> Unit,
+    devAccounts: List<DevAccount> = emptyList(),
+    onDevSignIn: (DevAccount) -> Unit = {},
+) {
     CenteredColumn {
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall)
         Text(
@@ -59,6 +66,11 @@ fun SignInScreen(signingIn: Boolean, error: SignInError?, onSignIn: () -> Unit) 
                 CircularProgressIndicator(Modifier.size(32.dp))
             } else {
                 Button(onClick = onSignIn) { Text(stringResource(R.string.sign_in_button)) }
+            }
+        }
+        if (!signingIn) {
+            devAccounts.forEach { account ->
+                OutlinedButton(onClick = { onDevSignIn(account) }) { Text(stringResource(account.label)) }
             }
         }
         if (error != null) {

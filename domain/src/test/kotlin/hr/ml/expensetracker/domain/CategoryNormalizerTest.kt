@@ -43,4 +43,14 @@ class CategoryNormalizerTest {
         assertEquals(Categories.DEFAULT.size, Categories.DEFAULT.toSet().size)
         assertFalse("Odjeća" in Categories.DEFAULT)
     }
+
+    @Test
+    fun `picker lists the most used categories first and skips legacy transfers`() {
+        val picker = Categories.FOR_PICKER
+        assertEquals(Categories.MOST_USED, picker.take(Categories.MOST_USED.size))
+        assertEquals(listOf("Hrana", "Prijevoz", "Hrana van"), picker.take(3))
+        assertFalse(Categories.LEGACY_TRANSFER in picker)
+        assertEquals(Categories.DEFAULT.toSet() - Categories.LEGACY_TRANSFER, picker.toSet())
+        assertEquals(picker.size, picker.distinct().size)
+    }
 }

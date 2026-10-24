@@ -26,12 +26,67 @@
     <string name="balance_settled">Sve je podmireno</string>
     <string name="home_empty">Nema troškova</string>
     <string name="home_load_error">Podaci se trenutno ne mogu učitati.</string>
-    <plurals name="home_expense_count">
-        <item quantity="one">%1$d trošak</item>
-        <item quantity="few">%1$d troška</item>
-        <item quantity="other">%1$d troškova</item>
-    </plurals>
 
-    <string name="add_placeholder">Unos troška stiže uskoro.</string>
+    <!-- Day headers and dates: "Danas", "Jučer", "24. listopada 2026." -->
+    <string name="day_today">Danas</string>
+    <string name="day_yesterday">Jučer</string>
+    <string name="date_long">%1$d. %2$s %3$d.</string>
+    <string-array name="months_genitive">
+        <item>siječnja</item>
+        <item>veljače</item>
+        <item>ožujka</item>
+        <item>travnja</item>
+        <item>svibnja</item>
+        <item>lipnja</item>
+        <item>srpnja</item>
+        <item>kolovoza</item>
+        <item>rujna</item>
+        <item>listopada</item>
+        <item>studenoga</item>
+        <item>prosinca</item>
+    </string-array>
+
+    <!-- Expense form (the "Dodaj" tab and editing) -->
+    <string name="amount_label">Iznos</string>
+    <string name="euro_suffix">€</string>
+    <string name="category_label">Kategorija</string>
+    <string name="description_label">Opis (neobavezno)</string>
+    <string name="paid_by_label">Platio/la</string>
+    <string name="split_label">Raspodjela</string>
+    <string name="split_half">Podjela</string>
+    <string name="split_full">Zajam</string>
+    <string name="split_half_hint">Svatko plaća pola</string>
+    <string name="split_full_hint">%1$s duguje cijeli iznos</string>
+    <string name="date_label">Datum</string>
+    <string name="save">Spremi</string>
+    <string name="save_amount">Spremi %1$s</string>
+    <string name="cancel">Odustani</string>
+    <string name="ok">U redu</string>
+    <string name="back">Natrag</string>
+    <string name="edit_title">Uredi trošak</string>
+    <string name="expense_saved">Trošak spremljen</string>
+
+    <!-- Home list -->
+    <string name="paid_by_lovel">Platio Lovel</string>
+    <string name="paid_by_marina">Platila Marina</string>
+    <string name="row_meta">%1$s · %2$s</string>
+    <string name="settlement_title">Podmirenje</string>
+    <string name="settlement_direction">%1$s → %2$s</string>
+    <string name="more_actions">Više radnji</string>
+    <string name="edit">Uredi</string>
+    <string name="delete">Obriši</string>
+    <string name="delete_expense_title">Obrisati trošak?</string>
+    <string name="delete_settlement_title">Obrisati podmirenje?</string>
+    <string name="expense_deleted">Trošak obrisan</string>
+    <string name="settlement_deleted">Podmirenje obrisano</string>
+    <string name="undo">Poništi</string>
+
+    <!-- Settle up -->
+    <string name="settle_up">Podmiri</string>
+    <string name="settle_lovel_pays">Lovel plaća Marini</string>
+    <string name="settle_marina_pays">Marina plaća Lovelu</string>
+    <string name="note_label">Napomena (neobavezno)</string>
+    <string name="settlement_saved">Podmirenje spremljeno</string>
+
     <string name="stats_placeholder">Statistika stiže uskoro.</string>
 </resources>

@@ -24,6 +24,17 @@ Start-Process "$sdk\emulator\emulator.exe" -ArgumentList '-avd','Pixel_9_new','-
 & "$sdk\platform-tools\adb.exe" shell am start -n hr.ml.expensetracker/.MainActivity
 ```
 
+Instrumented Compose UI tests (fake in-memory repositories via Koin, emulator running):
+
+```powershell
+.\gradlew.bat :app:connectedDebugAndroidTest
+```
+
+Local end-to-end run without real Google accounts (README "Local development with the Firebase
+emulators"): `firebase emulators:start --only auth,firestore --project troskovi-ml`, then
+`python tools\seed_members.py --emulator`, then `.\gradlew.bat :app:installDebug
+-PuseFirebaseEmulators=true` and tap "Dev: prijava kao Lovel".
+
 Firestore rules tests (Node + JDK 21 on PATH; no Firebase login, uses the emulator):
 
 ```powershell
@@ -52,7 +63,13 @@ python tools\export_legacy.py    # -> private\legacy_popis.csv, private\legacy_c
 - `:app` – Compose + Material 3 UI, ViewModels exposing `StateFlow`, Koin DI (`di/AppModule.kt`).
   Package `hr.ml.expensetracker`. `data/` = Firestore mappers and repositories; `session/` =
   Google sign-in, Firebase Auth and the `config/members` allow-list
-  (`SessionRepository.currentPerson` is the `createdBy` for new records).
+  (`SessionRepository.currentPerson`, injected as `CurrentPerson`, is the `createdBy` for new
+  records). `ui/` = `AppShell` (tabs + the expense editor overlay), `home/`, `expense/` (add/edit
+  form), `common/`. ViewModels of the signed-in screens live in `SessionViewModel.memberViewModels`
+  and are cleared when the member signs out.
+- `app/src/debug` vs `app/src/release`: `dev/DevEnvironment` (Firebase emulators + dev sign-in,
+  debug only, behind `BuildConfig.USE_FIREBASE_EMULATORS`; a no-op in release).
+- `app/src/sharedTest` – in-memory repositories used by both unit and instrumented tests.
 - `firestore.rules` + `firebase/rules-tests/` – security rules and their emulator tests. Field names
   in the rules, `data/FirestoreMappers.kt` and the tests must stay in sync.
 - `tools/` – Python admin scripts. Their output goes to `private/`, never into git.

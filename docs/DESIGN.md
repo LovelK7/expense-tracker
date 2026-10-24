@@ -45,6 +45,9 @@ Settlement(id, date: LocalDate, from: Person, to: Person, amountCents: Long, not
 Categories are a controlled list (seeded from the sheet's "Kategorije" tab plus every category
 actually used in the "POPIS" tab). Normalisation: trim, case-insensitive match ("hrana" → "Hrana");
 the legacy list entry "Odjeća" maps to the used name "Odjeća i oprema".
+The add form (Stage 3) lists the most used legacy categories first (Hrana, Prijevoz, Hrana van,
+Režije, Potrepštine, Putovanja, MPO, Adaptacija) and omits "Prijenos" for new expenses (transfers
+are settlements now); editing a legacy "Prijenos" row still shows it.
 
 ## Balance rules (the "brain")
 
