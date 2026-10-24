@@ -1,0 +1,27 @@
+# Private data and secrets (see docs/DESIGN.md)
+private/
+google-services.json
+local.properties
+*.jks
+*.keystore
+
+# Gradle / Kotlin / Android build output
+.gradle/
+.kotlin/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Python
+__pycache__/
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db

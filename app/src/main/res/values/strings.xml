@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="hr">
+    <string name="app_name">Troškovi</string>
+
+    <string name="nav_home">Početna</string>
+    <string name="nav_add">Dodaj</string>
+    <string name="nav_stats">Statistika</string>
+
+    <string name="home_placeholder">Stanje i nedavni troškovi stižu uskoro.</string>
+    <string name="add_placeholder">Unos troška stiže uskoro.</string>
+    <string name="stats_placeholder">Statistika stiže uskoro.</string>
+</resources>
