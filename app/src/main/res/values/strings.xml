@@ -140,4 +140,33 @@
     <string name="stats_percent">%1$s %%</string>
     <string name="stats_expand">Prikaži troškove</string>
     <string name="stats_collapse">Sakrij troškove</string>
+    <!-- Whose spending: both, or only what one person paid. -->
+    <string name="stats_person_both">Oboje</string>
+    <!-- Person view: "23 troška · 38 % ukupne potrošnje" -->
+    <string name="stats_person_summary">%1$s · %2$s ukupne potrošnje</string>
+    <!-- Transfers ("Prijenos") are not spending: "Prijenosi (isključeni): 1.000,00 €" -->
+    <string name="stats_transfers_excluded">Prijenosi (isključeni): %1$s</string>
+    <!-- "+12 % u odnosu na rujan 2026.", "−5 % u odnosu na 2025. (do danas)" -->
+    <string name="stats_compared_to">%1$s u odnosu na %2$s</string>
+    <string name="stats_year_to_date">%1$s (do danas)</string>
+    <string name="stats_by_year">Po godinama</string>
+    <!-- "Prosjek: 312,40 €/mj" -->
+    <string name="stats_monthly_average">Prosjek: %1$s/mj</string>
+    <string name="stats_period_share">Udio u razdoblju: %1$s</string>
+    <string name="stats_trend_description">Kretanje po mjesecima, zadnjih 12 mjeseci</string>
+    <string name="row_meta_three">%1$s · %2$s · %3$s</string>
+    <string-array name="months_short">
+        <item>sij</item>
+        <item>velj</item>
+        <item>ožu</item>
+        <item>tra</item>
+        <item>svi</item>
+        <item>lip</item>
+        <item>srp</item>
+        <item>kol</item>
+        <item>ruj</item>
+        <item>lis</item>
+        <item>stu</item>
+        <item>pro</item>
+    </string-array>
 </resources>

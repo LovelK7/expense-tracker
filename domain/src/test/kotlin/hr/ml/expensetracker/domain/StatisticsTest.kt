@@ -120,6 +120,85 @@ class StatisticsTest {
     }
 
     @Test
+    fun `transfers are not spending but are reported on the side`() {
+        val withTransfers = expenses + listOf(
+            expense(100_000, LOVEL, FULL_FOR_OTHER, d(2, 5), Categories.TRANSFER),
+            expense(2_500, MARINA, HALF, d(2, 6), Categories.TRANSFER),
+            expense(7_777, MARINA, FULL_FOR_OTHER, d(2, 7), Categories.TRANSFER, deleted = true),
+        )
+        val feb = Statistics.forMonth(withTransfers, YearMonth.of(2026, 2))
+        assertEquals(2501, feb.totalCents) // unchanged by the transfers
+        assertEquals(2, feb.expenseCount)
+        assertEquals(102_500, feb.transferCents)
+        assertEquals(2, feb.transferCount)
+        assertEquals(setOf("Hrana", "Poklon"), feb.byCategory.keys)
+        assertEquals(mapOf(YearMonth.of(2026, 2) to 2501L), feb.byMonth)
+        assertEquals(feb.totalCents, feb.shareByPerson.values.sum())
+        assertEquals(mapOf(LOVEL to 501L, MARINA to 2000L), feb.paidByPerson)
+        // The balance still counts them.
+        assertEquals(
+            BalanceCalculator.balanceCents(expenses) - 100_000 + 1_250,
+            BalanceCalculator.balanceCents(withTransfers),
+        )
+    }
+
+    @Test
+    fun `a period with only transfers has no spending`() {
+        val s = Statistics.forMonth(listOf(expense(5_000, LOVEL, FULL_FOR_OTHER, d(4, 1), Categories.TRANSFER)), YearMonth.of(2026, 4))
+        assertEquals(0, s.totalCents)
+        assertEquals(0, s.expenseCount)
+        assertEquals(5_000, s.transferCents)
+        assertEquals(emptyMap(), s.byCategory)
+    }
+
+    @Test
+    fun `Stanarina is ordinary spending`() {
+        val s = Statistics.forMonth(listOf(expense(50_000, MARINA, HALF, d(4, 1), "Stanarina")), YearMonth.of(2026, 4))
+        assertEquals(50_000, s.totalCents)
+        assertEquals(mapOf("Stanarina" to 50_000L), s.byCategory)
+    }
+
+    @Test
+    fun `person filter counts only what that person paid`() {
+        val withTransfer = expenses + expense(1_000, LOVEL, FULL_FOR_OTHER, d(3, 2), Categories.TRANSFER)
+        val lovel = Statistics.forYear(withTransfer, 2026, LOVEL)
+        assertEquals(LOVEL, lovel.person)
+        assertEquals(3000L + 501 + 700, lovel.totalCents)
+        assertEquals(3, lovel.expenseCount)
+        assertEquals(mapOf("Režije" to 3000L, "Zdravlje" to 700L, "Hrana" to 501L), lovel.byCategory)
+        assertEquals(1_000, lovel.transferCents)
+        assertEquals(mapOf(LOVEL to 4201L, MARINA to 0L), lovel.paidByPerson)
+
+        val marina = Statistics.forYear(withTransfer, 2026, MARINA)
+        assertEquals(1000L + 2000, marina.totalCents)
+        assertEquals(0, marina.transferCents)
+        assertEquals(Statistics.forYear(withTransfer, 2026).totalCents, lovel.totalCents + marina.totalCents)
+    }
+
+    @Test
+    fun `odd HALF totals are halved half-even`() {
+        // 4001 / 2 = 2000.5 -> 2000 (even); 4003 / 2 = 2001.5 -> 2002 (even).
+        val odd1 = Statistics.forMonth(listOf(expense(4_001, LOVEL, HALF, d(5, 1))), YearMonth.of(2026, 5))
+        assertEquals(mapOf(LOVEL to 2000L, MARINA to 2001L), odd1.shareByPerson)
+        val odd2 = Statistics.forMonth(listOf(expense(4_003, MARINA, HALF, d(5, 1))), YearMonth.of(2026, 5))
+        assertEquals(mapOf(LOVEL to 2002L, MARINA to 2001L), odd2.shareByPerson)
+    }
+
+    @Test
+    fun `all time range is the same for every person and includes transfers`() {
+        val list = listOf(
+            expense(100, LOVEL, HALF, d(3, 1, 2024)),
+            expense(200, MARINA, HALF, d(6, 1, 2025)),
+            expense(300, LOVEL, FULL_FOR_OTHER, d(9, 9, 2026), Categories.TRANSFER),
+        )
+        val marina = Statistics.forAll(list, MARINA)!!
+        assertEquals(d(3, 1, 2024), marina.from)
+        assertEquals(d(9, 9, 2026), marina.to)
+        assertEquals(200, marina.totalCents)
+        assertEquals(Statistics.forAll(list)!!.from, marina.from)
+    }
+
+    @Test
     fun `all time is null without live expenses`() {
         assertEquals(null, Statistics.forAll(emptyList()))
         assertEquals(null, Statistics.forAll(listOf(expense(100, LOVEL, deleted = true))))

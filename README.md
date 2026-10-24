@@ -48,7 +48,19 @@ current month is the default). Periods are by the expense date; deleted expenses
 are not counted. It shows the period total, each person's share (half of every shared expense
 plus loans taken on their behalf) next to what they actually paid, totals per category (tap one
 to list its expenses) and, for a year or all time, totals per month (all time: the last 24
-months). The numbers come from `Statistics` in `:domain`, computed off the main thread.
+months). The numbers come from `Statistics` and `Trends` in `:domain`, computed off the main
+thread.
+
+Transfers (category "Prijenos", money moved between the two of you) are not spending: they are
+left out of every statistic and shown as one line under the summary ("Prijenosi (isključeni):
+1.000,00 €"); the balance on Početna still counts them. The summary compares the period with the
+previous month and the same month last year (Mjesec) or with the previous year (Godina; for the
+current year up to today's date, "do danas"), e.g. "+12 % u odnosu na rujan 2026.". Expanding a
+category also shows its last 12 months as small bars with the monthly average. Sve adds "Po
+godinama": each year's total and monthly average. **Oboje | Lovel | Marina** below the period
+switches to one person's payments: the total becomes what that person paid, with the number of
+expenses and their share of the couple's spending. The rules are in
+[`docs/DESIGN.md`](docs/DESIGN.md), "Statistics rules".
 
 ### Design
 

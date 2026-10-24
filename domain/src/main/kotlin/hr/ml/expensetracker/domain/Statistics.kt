@@ -6,6 +6,10 @@ import java.time.YearMonth
 /**
  * Spending summary over an inclusive date range (mirrors the legacy "PIVOT" sheet).
  * All values are in cents and exclude deleted expenses.
+ *
+ * Transfers ([Categories.TRANSFER], money moved between the two people) are not spending: they
+ * are left out of every figure here except [transferCents]. With a [person] every figure covers
+ * only the expenses that person paid (see docs/DESIGN.md, "Statistics rules").
  */
 data class Statistics(
     val from: LocalDate,
@@ -23,8 +27,13 @@ data class Statistics(
     val shareByPerson: Map<Person, Long>,
     /** How much each person actually paid. */
     val paidByPerson: Map<Person, Long>,
-    /** Number of (non-deleted) expenses in the range. */
+    /** Number of (non-deleted, non-transfer) expenses in the range. */
     val expenseCount: Int = 0,
+    /** The transfers in the range (paid by [person], if set), excluded from everything above. */
+    val transferCents: Long = 0,
+    val transferCount: Int = 0,
+    /** Only expenses paid by this person are counted; null for both. */
+    val person: Person? = null,
 ) {
     /**
      * [byMonth] with the gaps filled: every calendar month from the first to the last month that
@@ -40,9 +49,25 @@ data class Statistics(
     }
 
     companion object {
-        fun compute(expenses: Iterable<Expense>, from: LocalDate, to: LocalDate): Statistics {
+        /** A live expense that counts as spending: not a transfer, paid by [person] when set. */
+        fun isSpending(e: Expense, person: Person? = null): Boolean =
+            !e.deleted && e.category != Categories.TRANSFER && (person == null || e.paidBy == person)
+
+        fun compute(expenses: Iterable<Expense>, from: LocalDate, to: LocalDate, person: Person? = null): Statistics {
             require(!to.isBefore(from)) { "Empty range: $from..$to" }
-            val inRange = expenses.filter { !it.deleted && !it.date.isBefore(from) && !it.date.isAfter(to) }
+            val inRange = ArrayList<Expense>()
+            var transferCents = 0L
+            var transferCount = 0
+            for (e in expenses) {
+                if (e.deleted || e.date.isBefore(from) || e.date.isAfter(to)) continue
+                if (person != null && e.paidBy != person) continue
+                if (e.category == Categories.TRANSFER) {
+                    transferCents += e.amountCents
+                    transferCount++
+                } else {
+                    inRange += e
+                }
+            }
 
             val byCategory = inRange.groupingBy { it.category }
                 .fold(0L) { acc, e -> acc + e.amountCents }
@@ -72,20 +97,30 @@ data class Statistics(
                     inRange.filter { it.paidBy == p }.sumOf { it.amountCents }
                 },
                 expenseCount = inRange.size,
+                transferCents = transferCents,
+                transferCount = transferCount,
+                person = person,
             )
         }
 
-        fun forMonth(expenses: Iterable<Expense>, month: YearMonth): Statistics =
-            compute(expenses, month.atDay(1), month.atEndOfMonth())
+        fun forMonth(expenses: Iterable<Expense>, month: YearMonth, person: Person? = null): Statistics =
+            compute(expenses, month.atDay(1), month.atEndOfMonth(), person)
 
-        fun forYear(expenses: Iterable<Expense>, year: Int): Statistics =
-            compute(expenses, LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31))
+        fun forYear(expenses: Iterable<Expense>, year: Int, person: Person? = null): Statistics =
+            compute(expenses, LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31), person)
 
         /**
-         * Everything: the range runs from the earliest to the latest non-deleted expense.
-         * Null when there is no such expense (there is no range to report on).
+         * Everything: the range runs from the earliest to the latest non-deleted expense of either
+         * person, transfers included, so it is the same whoever [person] is. Null when there is no
+         * such expense (there is no range to report on).
          */
-        fun forAll(expenses: Iterable<Expense>): Statistics? {
+        fun forAll(expenses: Iterable<Expense>, person: Person? = null): Statistics? {
+            val range = liveRange(expenses) ?: return null
+            return compute(expenses, range.start, range.endInclusive, person)
+        }
+
+        /** The earliest to the latest date of a non-deleted expense; null when there is none. */
+        fun liveRange(expenses: Iterable<Expense>): ClosedRange<LocalDate>? {
             var from: LocalDate? = null
             var to: LocalDate? = null
             for (e in expenses) {
@@ -93,7 +128,7 @@ data class Statistics(
                 if (from == null || e.date.isBefore(from)) from = e.date
                 if (to == null || e.date.isAfter(to)) to = e.date
             }
-            return if (from == null || to == null) null else compute(expenses, from, to)
+            return if (from == null || to == null) null else from..to
         }
     }
 }

@@ -38,9 +38,9 @@ class CategoryUsageOrderTest {
 
     @Test
     fun `categories outside the list are not added`() {
-        val expenses = uses(Categories.LEGACY_TRANSFER, 50) + uses("Nešto novo", 7) + uses("Usluge", 1)
+        val expenses = uses(Categories.TRANSFER, 50) + uses("Nešto novo", 7) + uses("Usluge", 1)
         val ordered = Categories.orderByUsage(expenses)
-        assertFalse(Categories.LEGACY_TRANSFER in ordered)
+        assertFalse(Categories.TRANSFER in ordered)
         assertFalse("Nešto novo" in ordered)
         assertEquals(listOf("Usluge") + (Categories.FOR_PICKER - "Usluge"), ordered)
     }
@@ -56,7 +56,7 @@ class CategoryUsageOrderTest {
         // Category counts of the legacy POPIS history as of 2026-10-24 (synthetic rows, real counts).
         val expenses = uses("Hrana", 385) + uses("Prijevoz", 173) + uses("Putovanja", 72) + uses("Režije", 70) +
             uses("Hrana van", 60) + uses("MPO", 53) + uses("Potrepštine", 48) + uses("Adaptacija", 45) +
-            uses("Stanarina", 37) + uses(Categories.LEGACY_TRANSFER, 32) + uses("Zdravlje", 25)
+            uses("Stanarina", 37) + uses(Categories.TRANSFER, 32) + uses("Zdravlje", 25)
         assertEquals(
             listOf("Hrana", "Prijevoz", "Putovanja", "Režije", "Hrana van", "MPO", "Potrepštine", "Adaptacija", "Stanarina", "Zdravlje"),
             Categories.orderByUsage(expenses).take(10),

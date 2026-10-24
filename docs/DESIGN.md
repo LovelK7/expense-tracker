@@ -80,6 +80,46 @@ prices (e.g. fuel at 17.787 €). Rounding each row to cents on import is the in
 Statistics (the "dashboard"): totals per category, totals per calendar month, each person's half,
 for a selected month or year, excluding deleted rows. Mirrors the legacy "PIVOT" sheet.
 
+## Statistics rules (Stage 8)
+
+All in `:domain` (`Statistics`, `Trends`, `Percent`), pure and unit tested; the Statistika tab only
+formats them.
+
+- **Transfers are not spending.** An expense in category `Categories.TRANSFER` ("Prijenos") is money
+  moved between the two people (the legacy way of settling up), not consumption. It is left out of
+  every spending figure: totals, expense counts, per-category, per-person share and paid, monthly
+  and yearly totals, comparisons and trends. It still counts in the balance (`BalanceCalculator`
+  is unchanged) and still appears on Početna. Statistika shows one line under the summary when
+  the period has any: "Prijenosi (isključeni): 1.000,00 €". Settlements are not spending either.
+- **Stanarina** (rent) is an ordinary category.
+- **Person view** ("Oboje | Lovel | Marina"): with a person selected every figure covers only the
+  expenses that person paid (`paidBy`). The summary shows "Plaćeno · <name>", the count and the
+  person's paid total as a whole percentage of both people's spending in the period. The share
+  table ("Udio") and "Udio po osobi" are hidden. The selection lives in the ViewModel.
+- **Percentages** shown as whole numbers are rounded half-even: change = (current − reference) ×
+  100 / reference, share = part × 100 / whole. Display "12 %" with a non-breaking space; a change
+  carries a sign: "+12 %", "−5 %" (real minus sign U+2212), "0 %". Category shares keep one
+  decimal ("34,5 %").
+- **Comparisons** in the summary card. Mjesec: against the previous month and the same month a
+  year earlier ("+12 % u odnosu na rujan 2026."). Godina: against the previous year; for the
+  current year both ranges run from 1 January to today's date ("… u odnosu na 2025. (do danas)",
+  29 February maps to the 28th). A comparison is hidden when the reference period has no spending
+  (`PeriodComparison.changePercent == null`). Sve has none. Months are compared in full, also the
+  current month.
+- **Category trend** (an expanded category): the category's spending in the 12 months ending with
+  the selected period's last month, clipped to the later of today's month and the latest expense
+  (Godina 2026 ends at the current month; Sve ends there too). Months of the selected period are
+  drawn stronger. "Prosjek: X €/mj" is the window's total divided by the window's months from the
+  first month with any spending (of the selected person) on, half-even; the share is the
+  category's part of the period total.
+- **Po godinama** (Sve): one row per calendar year, newest first, every year from the first to the
+  last with spending, with its total and monthly average. The average divides by the year's
+  months from the first month with any spending to the current month (or the latest expense when
+  that is later), clipped to the year: 2023–2025 by 12, 2026 by 10 (on 24 October 2026). The
+  24-month "Po mjesecima" list stays below it.
+- The Sve range runs from the earliest to the latest non-deleted expense of either person,
+  transfers included, so it does not change with the person selection.
+
 ## Screens (MVP)
 
 1. **Dodaj trošak** (add expense): amount, category chips, optional description, payer toggle
@@ -95,6 +135,8 @@ for a selected month or year, excluding deleted rows. Mirrors the legacy "PIVOT"
      card always stays global. The selection lives in the ViewModel (survives tab switches and
      rotation, not a restart).
 3. **Statistika** (stats): month/year picker, per-category totals, monthly trend, per-person half.
+   Stage 8 (see "Statistics rules"): transfers excluded, period comparisons, a 12-month trend per
+   expanded category, "Po godinama" in Sve, and a person view (Oboje | Lovel | Marina).
 
 Deferred (v2 backlog): recurring rent template, home-screen quick-add widget, receipt photos,
 budgets, custom split ratios, push notifications, web dashboard.

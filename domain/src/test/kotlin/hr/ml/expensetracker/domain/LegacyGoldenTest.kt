@@ -60,10 +60,35 @@ class LegacyGoldenTest {
     @Test
     fun `statistics shares add up over the full history`() {
         val all = Statistics.compute(expenses, expenses.minOf { it.date }, expenses.maxOf { it.date })
-        assertEquals(expenses.sumOf { it.amountCents }, all.totalCents)
+        // Transfers ("Prijenos") are not spending: excluded from the totals, reported on the side.
+        val transfers = expenses.filter { it.category == Categories.TRANSFER }
+        assertTrue(transfers.isNotEmpty())
+        assertEquals(transfers.sumOf { it.amountCents }, all.transferCents)
+        assertEquals(transfers.size, all.transferCount)
+        assertEquals(expenses.sumOf { it.amountCents }, all.totalCents + all.transferCents)
+        assertEquals(expenses.size - transfers.size, all.expenseCount)
+        assertTrue(Categories.TRANSFER !in all.byCategory)
         assertEquals(all.totalCents, all.shareByPerson.values.sum())
         assertEquals(all.totalCents, all.byCategory.values.sum())
         assertEquals(all.totalCents, all.byMonth.values.sum())
+    }
+
+    @Test
+    fun `per-person views and the year rows add up to the couple's spending`() {
+        val from = expenses.minOf { it.date }
+        val to = expenses.maxOf { it.date }
+        val all = Statistics.compute(expenses, from, to)
+        val lovel = Statistics.compute(expenses, from, to, Person.LOVEL)
+        val marina = Statistics.compute(expenses, from, to, Person.MARINA)
+        assertEquals(all.totalCents, lovel.totalCents + marina.totalCents)
+        assertEquals(all.expenseCount, lovel.expenseCount + marina.expenseCount)
+        assertEquals(all.transferCents, lovel.transferCents + marina.transferCents)
+        assertEquals(all.paidByPerson[Person.LOVEL], lovel.totalCents)
+
+        val years = Trends.byYear(expenses, today = to)
+        assertEquals(listOf(2026, 2025, 2024, 2023), years.map { it.year })
+        assertEquals(all.totalCents, years.sumOf { it.cents })
+        assertEquals(listOf(10, 12, 12, 12), years.map { it.months })
     }
 
     private fun findRepoRoot(): File? =

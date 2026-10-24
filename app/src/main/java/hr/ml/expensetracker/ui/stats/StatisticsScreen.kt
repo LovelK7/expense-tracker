@@ -38,8 +38,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -51,10 +53,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import hr.ml.expensetracker.R
 import hr.ml.expensetracker.domain.Expense
 import hr.ml.expensetracker.domain.Money
+import hr.ml.expensetracker.domain.Percent
 import hr.ml.expensetracker.domain.Person
 import hr.ml.expensetracker.domain.SplitType
 import hr.ml.expensetracker.ui.common.CategoryBadge
 import hr.ml.expensetracker.ui.common.CategoryVisuals
+import hr.ml.expensetracker.ui.common.expenseCountLabel
 import hr.ml.expensetracker.ui.common.label
 import hr.ml.expensetracker.ui.common.longDate
 import hr.ml.expensetracker.ui.common.monthLabel
@@ -73,8 +77,18 @@ object StatsTags {
     const val NEXT = "stats_next"
     const val PERIOD_LABEL = "stats_period_label"
     const val TOTAL = "stats_total"
+    const val PERSON_SUMMARY = "stats_person_summary"
+    const val TRANSFERS = "stats_transfers"
+    const val COMPARISON = "stats_comparison"
 
     fun category(name: String) = "stats_category:$name"
+
+    fun trend(category: String) = "stats_trend:$category"
+
+    fun year(year: Int) = "stats_year:$year"
+
+    /** The person selector's button; null is "Oboje". */
+    fun person(person: Person?) = "stats_person:${person?.name ?: "BOTH"}"
 }
 
 @Composable
@@ -83,6 +97,7 @@ fun StatisticsScreen(modifier: Modifier = Modifier, viewModel: StatisticsViewMod
     StatisticsContent(
         state = state,
         onModeChange = viewModel::setMode,
+        onPersonChange = viewModel::setPerson,
         onPrevious = viewModel::previous,
         onNext = viewModel::next,
         onToggleCategory = viewModel::toggleCategory,
@@ -94,6 +109,7 @@ fun StatisticsScreen(modifier: Modifier = Modifier, viewModel: StatisticsViewMod
 private fun StatisticsContent(
     state: StatsUiState,
     onModeChange: (StatsMode) -> Unit,
+    onPersonChange: (Person?) -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onToggleCategory: (String) -> Unit,
@@ -104,7 +120,7 @@ private fun StatisticsContent(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        item(key = "period") { PeriodSelector(state, onModeChange, onPrevious, onNext) }
+        item(key = "period") { PeriodSelector(state, onModeChange, onPersonChange, onPrevious, onNext) }
         when {
             state.loading -> item(key = "loading") {
                 Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
@@ -118,14 +134,19 @@ private fun StatisticsContent(
                     modifier = Modifier.padding(vertical = 16.dp),
                 )
             }
-            state.empty -> item(key = "empty") {
-                Text(
-                    text = stringResource(R.string.stats_empty),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
-                )
+            state.empty -> {
+                item(key = "empty") {
+                    Text(
+                        text = stringResource(R.string.stats_empty),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                    )
+                }
+                if (state.transferCents > 0) {
+                    item(key = "transfers") { TransfersLine(state.transferCents, TextAlign.Center) }
+                }
             }
             else -> statistics(state, onToggleCategory)
         }
@@ -133,7 +154,9 @@ private fun StatisticsContent(
 }
 
 private fun LazyListScope.statistics(state: StatsUiState, onToggleCategory: (String) -> Unit) {
-    item(key = "summary") { SummaryCard(state, Modifier.padding(top = 8.dp, bottom = 8.dp)) }
+    val transfers = state.transferCents > 0
+    item(key = "summary") { SummaryCard(state, Modifier.padding(top = 8.dp, bottom = if (transfers) 0.dp else 8.dp)) }
+    if (transfers) item(key = "transfers") { TransfersLine(state.transferCents) }
 
     item(key = "categories_header") { SectionHeader(stringResource(R.string.stats_by_category)) }
     state.categories.forEach { row ->
@@ -141,11 +164,13 @@ private fun LazyListScope.statistics(state: StatsUiState, onToggleCategory: (Str
             CategoryItem(row, state.totalCents, onClick = { onToggleCategory(row.category) })
         }
         if (row.expanded) {
-            items(row.expenses, key = { "expense:${it.id}" }) { ExpenseItem(it) }
+            row.trend?.let { trend -> item(key = "trend:${row.category}") { CategoryTrendCard(row, trend) } }
+            items(row.expenses, key = { "expense:${it.id}" }) { ExpenseItem(it, showPayer = state.person == null) }
         }
     }
 
     if (state.mode == StatsMode.MONTH) {
+        if (state.people.isEmpty()) return
         item(key = "people_header") { SectionHeader(stringResource(R.string.stats_share_by_person)) }
         items(state.people, key = { "share:${it.person}" }) { person ->
             BarRow(
@@ -157,6 +182,10 @@ private fun LazyListScope.statistics(state: StatsUiState, onToggleCategory: (Str
             )
         }
     } else {
+        if (state.years.isNotEmpty()) {
+            item(key = "years_header") { SectionHeader(stringResource(R.string.stats_by_year)) }
+            items(state.years, key = { "year:${it.year}" }) { YearItem(it) }
+        }
         item(key = "months_header") { SectionHeader(stringResource(R.string.stats_by_month)) }
         items(state.months, key = { "month:${it.month}" }) { month ->
             BarRow(
@@ -183,6 +212,7 @@ private fun LazyListScope.statistics(state: StatsUiState, onToggleCategory: (Str
 private fun PeriodSelector(
     state: StatsUiState,
     onModeChange: (StatsMode) -> Unit,
+    onPersonChange: (Person?) -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
 ) {
@@ -217,6 +247,25 @@ private fun PeriodSelector(
                     Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = stringResource(R.string.stats_next))
                 }
             }
+        }
+        PersonSelector(state.person, onPersonChange)
+    }
+}
+
+private val PERSON_CHOICES: List<Person?> = listOf(null) + Person.entries
+
+/** "Oboje | Lovel | Marina": whose spending the statistics cover. */
+@Composable
+private fun PersonSelector(selected: Person?, onChange: (Person?) -> Unit) {
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        PERSON_CHOICES.forEachIndexed { index, person ->
+            SegmentedButton(
+                selected = selected == person,
+                onClick = { onChange(person) },
+                shape = SegmentedButtonDefaults.itemShape(index, PERSON_CHOICES.size),
+                label = { Text(stringResource(person?.label ?: R.string.stats_person_both)) },
+                modifier = Modifier.testTag(StatsTags.person(person)),
+            )
         }
     }
 }
@@ -276,21 +325,73 @@ private fun SummaryCard(state: StatsUiState, modifier: Modifier = Modifier) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
     ) {
         val onContainer = MaterialTheme.colorScheme.onPrimaryContainer
+        val person = state.person
         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.stats_total), style = MaterialTheme.typography.labelLarge, color = onContainer)
+            Text(
+                text = if (person == null) {
+                    stringResource(R.string.stats_total)
+                } else {
+                    stringResource(R.string.row_meta, stringResource(R.string.stats_paid), stringResource(person.label))
+                },
+                style = MaterialTheme.typography.labelLarge,
+                color = onContainer,
+            )
             Text(
                 text = Money.format(state.totalCents),
                 style = MaterialTheme.typography.displaySmall,
                 color = onContainer,
                 modifier = Modifier.testTag(StatsTags.TOTAL),
             )
-            Spacer(Modifier.height(4.dp))
-            SummaryLine("", stringResource(R.string.stats_share), stringResource(R.string.stats_paid), header = true)
-            state.people.forEach { p ->
-                SummaryLine(stringResource(p.person.label), Money.format(p.shareCents), Money.format(p.paidCents))
+            if (person != null) {
+                val count = expenseCountLabel(state.expenseCount)
+                val percent = state.personPercent
+                Text(
+                    text = if (percent == null) count else stringResource(R.string.stats_person_summary, count, Percent.format(percent)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = onContainer,
+                    modifier = Modifier.testTag(StatsTags.PERSON_SUMMARY),
+                )
+            }
+            state.comparisons.forEach { ComparisonLine(it) }
+            if (state.people.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                SummaryLine("", stringResource(R.string.stats_share), stringResource(R.string.stats_paid), header = true)
+                state.people.forEach { p ->
+                    SummaryLine(stringResource(p.person.label), Money.format(p.shareCents), Money.format(p.paidCents))
+                }
             }
         }
     }
+}
+
+/** "+12 % u odnosu na rujan 2026.", "−5 % u odnosu na 2025. (do danas)". */
+@Composable
+private fun ComparisonLine(row: ComparisonRow) {
+    val reference = when (val ref = row.reference) {
+        is ComparisonReference.Month -> monthLabel(ref.month)
+        is ComparisonReference.Year -> {
+            val year = stringResource(R.string.year_label, ref.year)
+            if (ref.toDate) stringResource(R.string.stats_year_to_date, year) else year
+        }
+    }
+    Text(
+        text = stringResource(R.string.stats_compared_to, Percent.formatChange(row.changePercent), reference),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onPrimaryContainer,
+        modifier = Modifier.testTag(StatsTags.COMPARISON),
+    )
+}
+
+/** "Prijenosi (isključeni): 1.000,00 €": the period's transfers, which are not spending. */
+@Composable
+private fun TransfersLine(cents: Long, align: TextAlign = TextAlign.Start) {
+    Text(
+        text = stringResource(R.string.stats_transfers_excluded, Money.format(cents)),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = align,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp).testTag(StatsTags.TRANSFERS),
+    )
 }
 
 @Composable
@@ -329,6 +430,92 @@ private fun CategoryItem(row: CategoryRow, totalCents: Long, onClick: () -> Unit
                 bold = row.expanded,
             )
         }
+    }
+}
+
+private val TREND_HEIGHT = 64.dp
+
+/** An expanded category's last 12 months as small columns, its monthly average and its share of the period. */
+@Composable
+private fun CategoryTrendCard(row: CategoryRow, trend: CategoryTrendUi) {
+    val color = CategoryVisuals.tint(row.category)
+    val shortMonths = stringArrayResource(R.array.months_short)
+    val description = stringResource(R.string.stats_trend_description)
+    Column(
+        Modifier
+            .padding(start = 16.dp, top = 4.dp, bottom = 4.dp)
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .background(AppTheme.colors.card)
+            .testTag(StatsTags.trend(row.category))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().height(TREND_HEIGHT).semantics { contentDescription = description },
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            trend.bars.forEach { bar ->
+                Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.BottomCenter) {
+                    // Every month gets a thin baseline; a month with spending at least a sliver of a column.
+                    Box(Modifier.fillMaxWidth().height(2.dp).background(MaterialTheme.colorScheme.surfaceVariant))
+                    if (bar.cents > 0) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .fillMaxHeight(bar.fraction.coerceAtLeast(0.04f))
+                                .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
+                                .background(if (bar.inPeriod) color else color.copy(alpha = 0.4f)),
+                        )
+                    }
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            trend.bars.forEach { bar ->
+                Text(
+                    text = shortMonths[bar.month.monthValue - 1],
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (bar.inPeriod) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(R.string.stats_monthly_average, Money.format(trend.monthlyAverageCents)),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = stringResource(R.string.stats_period_share, percentText(row.percent)),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** "2026." with its total and bar, and the year's monthly average below. */
+@Composable
+private fun YearItem(row: YearRow) {
+    Column(Modifier.fillMaxWidth().testTag(StatsTags.year(row.year)).padding(horizontal = 8.dp, vertical = 8.dp)) {
+        BarContent(
+            title = stringResource(R.string.year_label, row.year),
+            amount = Money.format(row.cents),
+            detail = null,
+            fraction = row.barFraction,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = stringResource(R.string.stats_monthly_average, Money.format(row.monthlyAverageCents)),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -387,8 +574,9 @@ private fun Bar(fraction: Float, color: Color) {
     }
 }
 
+/** One expense of an expanded category: date, payer (both people only) and split. */
 @Composable
-private fun ExpenseItem(expense: Expense) {
+private fun ExpenseItem(expense: Expense, showPayer: Boolean) {
     ListItem(
         leadingContent = { CategoryBadge(expense.category, size = 32.dp) },
         headlineContent = { Text(expense.category) },
@@ -397,10 +585,19 @@ private fun ExpenseItem(expense: Expense) {
                 if (expense.description.isNotBlank()) {
                     Text(expense.description, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
+                val split = stringResource(expense.split.label)
                 Text(
-                    text = stringResource(R.string.row_meta, longDate(expense.date), stringResource(expense.paidBy.paidByLabel)),
+                    text = if (showPayer) {
+                        stringResource(R.string.row_meta_three, longDate(expense.date), stringResource(expense.paidBy.paidByLabel), split)
+                    } else {
+                        stringResource(R.string.row_meta, longDate(expense.date), split)
+                    },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (expense.split == SplitType.FULL_FOR_OTHER) {
+                        MaterialTheme.colorScheme.tertiary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                 )
             }
         },
@@ -410,7 +607,7 @@ private fun ExpenseItem(expense: Expense) {
     )
 }
 
-@Preview(showBackground = true, heightDp = 900)
+@Preview(showBackground = true, heightDp = 1100)
 @Composable
 private fun StatisticsMonthPreview() {
     val at = Instant.parse("2026-10-24T08:00:00Z")
@@ -423,16 +620,36 @@ private fun StatisticsMonthPreview() {
                 canGoPrevious = true,
                 expenseCount = 3,
                 totalCents = 18_250,
+                transferCents = 100_000,
+                comparisons = listOf(
+                    ComparisonRow(12, ComparisonReference.Month(YearMonth.of(2026, 9))),
+                    ComparisonRow(-5, ComparisonReference.Month(YearMonth.of(2025, 10))),
+                ),
                 people = listOf(
                     PersonRow(Person.LOVEL, 9_125, 4_250, 0.5f),
                     PersonRow(Person.MARINA, 9_125, 14_000, 0.5f),
                 ),
                 categories = listOf(
                     CategoryRow("Režije", 14_000, 76.7, 1f),
-                    CategoryRow("Hrana", 4_250, 23.3, 0.3f, expanded = true, expenses = listOf(konzum)),
+                    CategoryRow(
+                        category = "Hrana",
+                        cents = 4_250,
+                        percent = 23.3,
+                        barFraction = 0.3f,
+                        expanded = true,
+                        expenses = listOf(konzum),
+                        trend = CategoryTrendUi(
+                            bars = (0L until 12L).map { i ->
+                                val cents = (i * 397 % 1_000) * 10
+                                TrendBar(YearMonth.of(2025, 11).plusMonths(i), cents, cents / 9_990f, inPeriod = i == 11L)
+                            },
+                            monthlyAverageCents = 4_312,
+                        ),
+                    ),
                 ),
             ),
             onModeChange = {},
+            onPersonChange = {},
             onPrevious = {},
             onNext = {},
             onToggleCategory = {},

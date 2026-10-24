@@ -70,7 +70,8 @@ Never test the data scripts against the real project; use the emulator (`--emula
 ## Layout
 
 - `:domain` – pure Kotlin/JVM, no Android deps. `Expense`, `Settlement`, `Person`, `SplitType`,
-  `BalanceCalculator`, `Statistics`, `CategoryNormalizer`, `Money`, `LegacyCsvParser`, `Members`,
+  `BalanceCalculator`, `Statistics` + `Trends`/`Percent` (spending stats without "Prijenos"
+  transfers, comparisons, category and year trends), `CategoryNormalizer`, `Money`, `LegacyCsvParser`, `Members`,
   `RecordFilter`/`SearchText` (home month filter + diacritics-insensitive search), `CroatianPlural`,
   repository interfaces (`ExpenseRepository`, `SettlementRepository`).
 - `:app` – Compose + Material 3 UI, ViewModels exposing `StateFlow`, Koin DI (`di/AppModule.kt`).

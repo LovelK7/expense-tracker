@@ -43,15 +43,19 @@ object Categories {
         "Adaptacija",
     )
 
-    /** Legacy-only: transfers are recorded as settlements from now on, so new expenses skip it. */
-    const val LEGACY_TRANSFER = "Prijenos"
+    /**
+     * Money moved between the two people (the legacy way of settling up), not consumption.
+     * Statistics leave it out of every spending figure but the balance counts it like any expense.
+     * Transfers are recorded as settlements from now on, so new expenses skip it.
+     */
+    const val TRANSFER = "Prijenos"
 
     /**
      * Categories offered for a new expense in their static order: [MOST_USED] first, then the rest
      * in list order. The add form shows them by real usage ([orderByUsage]); this order is the
      * fallback without data and the tie-break.
      */
-    val FOR_PICKER: List<String> = MOST_USED + (DEFAULT - MOST_USED.toSet() - LEGACY_TRANSFER)
+    val FOR_PICKER: List<String> = MOST_USED + (DEFAULT - MOST_USED.toSet() - TRANSFER)
 
     /**
      * [categories] ordered by how many non-deleted [expenses] use each one (all time), most used

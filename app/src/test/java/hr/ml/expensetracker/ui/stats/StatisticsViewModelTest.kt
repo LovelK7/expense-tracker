@@ -1,5 +1,6 @@
 package hr.ml.expensetracker.ui.stats
 
+import hr.ml.expensetracker.domain.Categories
 import hr.ml.expensetracker.domain.Expense
 import hr.ml.expensetracker.domain.ExpenseRepository
 import hr.ml.expensetracker.domain.Person
@@ -313,6 +314,251 @@ class StatisticsViewModelTest {
         add(1_250, d(2026, 10, 24))
         assertEquals(1_250L, vm.state.value.totalCents)
         assertEquals(listOf("Hrana"), vm.state.value.categories.map { it.category })
+    }
+
+    @Test
+    fun transfersAreExcludedAndReportedOnTheSide() = runTest {
+        add(100_000, d(2026, 10, 3), Categories.TRANSFER, split = SplitType.FULL_FOR_OTHER)
+        add(2_000, d(2026, 10, 4), "Hrana")
+        add(50_000, d(2026, 10, 5), "Stanarina", paidBy = Person.MARINA) // rent is ordinary spending
+        val vm = viewModel()
+        val s = vm.state.value
+        assertEquals(52_000L, s.totalCents)
+        assertEquals(2, s.expenseCount)
+        assertEquals(100_000L, s.transferCents)
+        assertEquals(listOf("Stanarina", "Hrana"), s.categories.map { it.category })
+        assertEquals(s.totalCents, s.people.sumOf { it.shareCents })
+        assertEquals(s.totalCents, s.people.sumOf { it.paidCents })
+
+        // Marina paid no transfer: no line in her view.
+        vm.setPerson(Person.MARINA)
+        assertEquals(0L, vm.state.value.transferCents)
+        vm.setPerson(Person.LOVEL)
+        assertEquals(100_000L, vm.state.value.transferCents)
+        assertEquals(2_000L, vm.state.value.totalCents)
+    }
+
+    @Test
+    fun aPeriodWithOnlyTransfersIsEmptyButShowsThem() = runTest {
+        add(5_000, d(2026, 10, 3), Categories.TRANSFER, split = SplitType.FULL_FOR_OTHER)
+        val s = viewModel().state.value
+        assertTrue(s.empty)
+        assertEquals(5_000L, s.transferCents)
+    }
+
+    @Test
+    fun personViewCoversOnlyWhatThatPersonPaid() = runTest {
+        val konzum = add(3_000, d(2026, 10, 1), "Hrana", Person.LOVEL, description = "Konzum")
+        add(1_000, d(2026, 10, 2), "Hrana", Person.MARINA)
+        val gorivo = add(2_000, d(2026, 10, 3), "Prijevoz", Person.LOVEL, SplitType.FULL_FOR_OTHER)
+        add(4_000, d(2026, 10, 4), "Režije", Person.MARINA)
+        val vm = viewModel()
+        assertEquals(null, vm.state.value.person)
+        assertEquals(2, vm.state.value.people.size)
+        assertEquals(null, vm.state.value.personPercent)
+
+        vm.setPerson(Person.LOVEL)
+        val s = vm.state.value
+        assertEquals(Person.LOVEL, s.person)
+        assertEquals(5_000L, s.totalCents)
+        assertEquals(2, s.expenseCount)
+        assertEquals(50, s.personPercent) // 5000 of 10000
+        assertTrue(s.people.isEmpty()) // no "Udio" in the person view
+        assertEquals(listOf("Hrana" to 3_000L, "Prijevoz" to 2_000L), s.categories.map { it.category to it.cents })
+        assertEquals(listOf(60.0, 40.0), s.categories.map { it.percent })
+
+        vm.toggleCategory("Hrana")
+        vm.toggleCategory("Prijevoz")
+        assertEquals(listOf(konzum), vm.state.value.categories.single { it.category == "Hrana" }.expenses)
+        assertEquals(listOf(gorivo), vm.state.value.categories.single { it.category == "Prijevoz" }.expenses)
+
+        vm.setPerson(Person.MARINA)
+        assertEquals(5_000L, vm.state.value.totalCents)
+        assertEquals(listOf("Režije", "Hrana"), vm.state.value.categories.map { it.category })
+        assertEquals(1_000L, vm.state.value.categories.single { it.category == "Hrana" }.expenses.single().amountCents)
+
+        vm.setPerson(null)
+        assertEquals(10_000L, vm.state.value.totalCents)
+        assertEquals(2, vm.state.value.people.size)
+    }
+
+    @Test
+    fun personPercentIsRoundedHalfEven() = runTest {
+        add(1, d(2026, 10, 1), paidBy = Person.LOVEL)
+        add(7, d(2026, 10, 2), paidBy = Person.MARINA)
+        val vm = viewModel()
+        vm.setPerson(Person.LOVEL)
+        assertEquals(12, vm.state.value.personPercent) // 12.5 -> 12
+        vm.setPerson(Person.MARINA)
+        assertEquals(88, vm.state.value.personPercent) // 87.5 -> 88
+    }
+
+    @Test
+    fun personSelectionSurvivesModeSwitchesAndNavigation() = runTest {
+        add(1_000, d(2025, 6, 1), paidBy = Person.MARINA)
+        add(2_000, d(2026, 10, 1), paidBy = Person.MARINA)
+        add(9_000, d(2026, 10, 2), paidBy = Person.LOVEL)
+        val vm = viewModel()
+        vm.setPerson(Person.MARINA)
+        vm.toggleCategory("Hrana")
+        vm.setMode(StatsMode.YEAR)
+        assertEquals(Person.MARINA, vm.state.value.person)
+        assertEquals(2_000L, vm.state.value.totalCents)
+        vm.previous()
+        assertEquals(1_000L, vm.state.value.totalCents)
+        vm.setMode(StatsMode.ALL)
+        assertEquals(Person.MARINA, vm.state.value.person)
+        assertEquals(3_000L, vm.state.value.totalCents)
+        assertTrue(vm.state.value.categories.single().expanded)
+        vm.setMode(StatsMode.MONTH)
+        assertEquals(Person.MARINA, vm.state.value.selection.person)
+        assertEquals(YearMonth.of(2025, 12), vm.state.value.selection.month)
+    }
+
+    @Test
+    fun oneStatePerChange() = runTest {
+        add(1_000, d(2026, 10, 1), paidBy = Person.MARINA)
+        add(2_000, d(2026, 10, 2), paidBy = Person.LOVEL)
+        val vm = viewModel()
+        val seen = mutableListOf<StatsUiState>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect { seen += it } }
+        val before = seen.size
+        vm.setPerson(Person.LOVEL)
+        assertEquals(before + 1, seen.size)
+        vm.toggleCategory("Hrana")
+        assertEquals(before + 2, seen.size)
+        vm.setMode(StatsMode.YEAR)
+        assertEquals(before + 3, seen.size)
+    }
+
+    @Test
+    fun monthComparesWithThePreviousMonthAndTheSameMonthAYearEarlier() = runTest {
+        add(10_000, d(2025, 10, 10))
+        add(20_000, d(2026, 9, 10))
+        add(22_400, d(2026, 10, 10))
+        add(77_777, d(2026, 9, 11), Categories.TRANSFER) // not part of September's spending
+        val vm = viewModel()
+        assertEquals(
+            listOf(
+                ComparisonRow(12, ComparisonReference.Month(YearMonth.of(2026, 9))),
+                ComparisonRow(124, ComparisonReference.Month(YearMonth.of(2025, 10))),
+            ),
+            vm.state.value.comparisons,
+        )
+        // September 2026: August has no data, September 2025 neither: no lines.
+        vm.previous()
+        assertEquals(emptyList<ComparisonRow>(), vm.state.value.comparisons)
+    }
+
+    @Test
+    fun comparisonsFollowThePersonFilter() = runTest {
+        add(10_000, d(2026, 9, 10), paidBy = Person.LOVEL)
+        add(9_500, d(2026, 10, 10), paidBy = Person.LOVEL)
+        add(5_000, d(2026, 10, 11), paidBy = Person.MARINA)
+        val vm = viewModel()
+        assertEquals(listOf(ComparisonRow(45, ComparisonReference.Month(YearMonth.of(2026, 9)))), vm.state.value.comparisons)
+        vm.setPerson(Person.LOVEL)
+        assertEquals(listOf(ComparisonRow(-5, ComparisonReference.Month(YearMonth.of(2026, 9)))), vm.state.value.comparisons)
+        vm.setPerson(Person.MARINA)
+        assertEquals(emptyList<ComparisonRow>(), vm.state.value.comparisons) // Marina paid nothing in September
+    }
+
+    @Test
+    fun theCurrentYearIsComparedYearToDate() = runTest {
+        add(1_000, d(2024, 5, 1))
+        add(1_500, d(2025, 3, 1))
+        add(9_000, d(2025, 11, 1)) // after 24 October: not in the year-to-date reference
+        add(1_800, d(2026, 2, 1))
+        val vm = viewModel()
+        vm.setMode(StatsMode.YEAR)
+        assertEquals(listOf(ComparisonRow(20, ComparisonReference.Year(2025, toDate = true))), vm.state.value.comparisons)
+        vm.previous()
+        // 2025 in full against 2024 in full: 10500 vs 1000.
+        assertEquals(listOf(ComparisonRow(950, ComparisonReference.Year(2024, toDate = false))), vm.state.value.comparisons)
+        vm.previous()
+        assertEquals(emptyList<ComparisonRow>(), vm.state.value.comparisons) // nothing in 2023
+        vm.setMode(StatsMode.ALL)
+        assertEquals(emptyList<ComparisonRow>(), vm.state.value.comparisons)
+    }
+
+    @Test
+    fun anExpandedCategoryShowsItsTwelveMonthTrend() = runTest {
+        // Hrana: 1000 a month from November 2024 to October 2026; Režije only in March 2026.
+        (0L until 24L).forEach { add(1_000, d(2024, 11, 5).plusMonths(it), "Hrana") }
+        add(6_000, d(2026, 3, 1), "Režije")
+        add(3_000, d(2026, 10, 6), "Hrana", Person.MARINA)
+        val vm = viewModel()
+        assertEquals(null, vm.state.value.categories.single { it.category == "Hrana" }.trend)
+        vm.toggleCategory("Hrana")
+        vm.toggleCategory("Režije")
+
+        val hrana = vm.state.value.categories.single { it.category == "Hrana" }.trend!!
+        assertEquals((0L until 12L).map { YearMonth.of(2025, 11).plusMonths(it) }, hrana.bars.map { it.month })
+        assertEquals(listOf(october), hrana.bars.filter { it.inPeriod }.map { it.month })
+        assertEquals(4_000L, hrana.bars.last().cents)
+        assertEquals(1f, hrana.bars.last().fraction)
+        assertEquals(0.25f, hrana.bars.first().fraction, 1e-6f)
+        assertEquals(1_250L, hrana.monthlyAverageCents) // 15000 / 12
+
+        // Režije has no October spending, so no row; it stays expanded and shows up in March.
+        assertEquals(null, vm.state.value.categories.firstOrNull { it.category == "Režije" })
+        repeat(7) { vm.previous() }
+        assertEquals(YearMonth.of(2026, 3), vm.state.value.selection.month)
+        val march = vm.state.value.categories.single { it.category == "Režije" }.trend!!
+        assertEquals(YearMonth.of(2026, 3), march.bars.last().month)
+        assertEquals(500L, march.monthlyAverageCents) // 6000 / 12
+
+        // Person view: Marina's Hrana, averaged from her first month (October 2026).
+        vm.setMode(StatsMode.YEAR)
+        vm.setPerson(Person.MARINA)
+        val marina = vm.state.value.categories.single { it.category == "Hrana" }.trend!!
+        assertEquals(october, marina.bars.last().month) // Godina of the current year: ends today
+        assertEquals(3_000L, marina.monthlyAverageCents)
+        assertEquals((1..10).map { YearMonth.of(2026, it) }, marina.bars.filter { it.inPeriod }.map { it.month })
+    }
+
+    @Test
+    fun trendWindowsOfPastYearsAndAllTime() = runTest {
+        add(1_200, d(2024, 1, 5))
+        add(2_400, d(2024, 12, 5))
+        add(100, d(2026, 10, 5))
+        val vm = viewModel()
+        vm.setMode(StatsMode.YEAR)
+        vm.previous()
+        vm.previous()
+        vm.toggleCategory("Hrana")
+        val y2024 = vm.state.value.categories.single().trend!!
+        assertEquals((1..12).map { YearMonth.of(2024, it) }, y2024.bars.map { it.month })
+        assertTrue(y2024.bars.all { it.inPeriod })
+        assertEquals(300L, y2024.monthlyAverageCents)
+
+        vm.setMode(StatsMode.ALL)
+        val all = vm.state.value.categories.single().trend!!
+        assertEquals(october, all.bars.last().month)
+        assertEquals(YearMonth.of(2025, 11), all.bars.first().month)
+        assertTrue(all.bars.all { it.inPeriod })
+    }
+
+    @Test
+    fun allTimeListsTheYearsNewestFirstWithMonthlyAverages() = runTest {
+        add(12_000, d(2023, 1, 10))
+        add(6_000, d(2024, 7, 1))
+        add(10_000, d(2026, 5, 1), paidBy = Person.MARINA)
+        add(99_999, d(2025, 5, 1), Categories.TRANSFER)
+        val vm = viewModel()
+        assertTrue(vm.state.value.years.isEmpty()) // Mjesec: no year rows
+        vm.setMode(StatsMode.ALL)
+        val years = vm.state.value.years
+        assertEquals(listOf(2026, 2025, 2024, 2023), years.map { it.year })
+        assertEquals(listOf(10_000L, 0L, 6_000L, 12_000L), years.map { it.cents })
+        assertEquals(listOf(1_000L, 0L, 500L, 1_000L), years.map { it.monthlyAverageCents }) // 2026: 10 months
+        listOf(10_000f / 12_000, 0f, 0.5f, 1f).zip(years) { expected, row -> assertEquals(expected, row.barFraction, 1e-6f) }
+        assertTrue(vm.state.value.months.isNotEmpty()) // "Po mjesecima" stays below
+
+        vm.setPerson(Person.MARINA)
+        assertEquals(listOf(2026), vm.state.value.years.map { it.year })
+        vm.setMode(StatsMode.YEAR)
+        assertTrue(vm.state.value.years.isEmpty())
     }
 
     @Test
