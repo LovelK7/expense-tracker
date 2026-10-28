@@ -201,9 +201,9 @@ LEGACY_ID_PREFIX = "legacy-"
 
 # domain/.../Categories.kt: Categories.DEFAULT and Categories.DEFAULT_ALIASES.
 CATEGORIES = (
-    "Adaptacija", "Banka", "Edukacija", "Gotovina", "Hrana", "Hrana van", "Kredit", "MPO",
-    "Odjeća i oprema", "Osiguranje", "Ostalo", "Poklon", "Potrepštine", "Prijenos", "Prijevoz",
-    "Putovanja", "Režije", "Stanarina", "Usluge", "Zabava", "Zdravlje",
+    "Adaptacija", "Armus stan", "Banka", "Edukacija", "Gotovina", "Hrana", "Hrana van", "Kredit",
+    "MPO", "Odjeća i oprema", "Osiguranje", "Ostalo", "Poklon", "Potrepštine", "Prijenos",
+    "Prijevoz", "Putovanja", "Režije", "Stanarina", "Usluge", "Zabava", "Zdravlje",
 )
 CATEGORY_ALIASES = {"Odjeća": "Odjeća i oprema"}
 

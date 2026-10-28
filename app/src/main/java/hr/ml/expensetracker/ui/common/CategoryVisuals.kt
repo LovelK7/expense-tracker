@@ -50,6 +50,7 @@ object CategoryVisuals {
         "Gotovina" to Visual(R.drawable.ic_cat_payments, CategoryHue.GREEN),
         "Kredit" to Visual(R.drawable.ic_cat_credit_card, CategoryHue.NAVY),
         "Osiguranje" to Visual(R.drawable.ic_cat_shield, CategoryHue.SLATE),
+        "Armus stan" to Visual(R.drawable.ic_cat_apartment, CategoryHue.TEAL),
     )
 
     fun of(category: String): Visual = BY_NAME[category] ?: FALLBACK
@@ -70,6 +71,7 @@ object CategoryVisuals {
         "Odjeća i oprema",
         "Adaptacija",
         "Zabava",
+        "Armus stan",
         "Hrana van",
         "Prijevoz",
         "Zdravlje",

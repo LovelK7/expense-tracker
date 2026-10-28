@@ -1,0 +1,11 @@
+<!-- Hand-drawn apartment block (rounded body, six window cut-outs), same 960 grid as the Material Symbols icons. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <path
+        android:fillColor="#FF000000"
+        android:fillType="evenOdd"
+        android:pathData="M280,120H680Q760,120 760,200V840H200V200Q200,120 280,120ZM300,240H420V340H300ZM540,240H660V340H540ZM300,420H420V520H300ZM540,420H660V520H540ZM300,600H420V700H300ZM540,600H660V700H540Z" />
+</vector>

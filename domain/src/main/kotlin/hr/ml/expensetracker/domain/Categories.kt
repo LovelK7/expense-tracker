@@ -9,6 +9,7 @@ object Categories {
      */
     val DEFAULT: List<String> = listOf(
         "Adaptacija",
+        "Armus stan",
         "Banka",
         "Edukacija",
         "Gotovina",
